@@ -32,7 +32,7 @@ echo "Database: " . $_ENV['DB_DATABASE'] . "\n";
 echo "Username: " . $_ENV['DB_USERNAME'] . "\n";
 // Don't echo password for security
 
-// Create capsule instance
+// Create capsule instance with options to avoid plugin issues
 $capsule = new Capsule;
 
 try {
@@ -48,15 +48,23 @@ try {
         'charset'   => 'utf8',
         'collation' => 'utf8_unicode_ci',
         'prefix'    => '',
+        'options' => [
+            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+            PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+            // Disable SSL if it's causing issues
+            PDO::MYSQL_ATTR_SSL_KEY => null,
+            PDO::MYSQL_ATTR_SSL_CERT => null,
+            PDO::MYSQL_ATTR_SSL_CA => null,
+        ],
     ]);
 
     // Test the connection
     $capsule->connection()->select('SELECT 1');
     echo "✓ Database connection successful!\n";
     
-    // Show existing tables
+    // Show existing tables using a simpler query
     try {
-        $tables = $capsule->schema()->getConnection()->select('SHOW TABLES');
+        $tables = $capsule->connection()->select('SHOW TABLES');
         echo "Existing tables:\n";
         foreach ($tables as $table) {
             $tableName = array_values((array)$table)[0];
@@ -64,9 +72,23 @@ try {
         }
     } catch (Exception $e) {
         echo "⚠ Could not retrieve table list: " . $e->getMessage() . "\n";
+        // Try alternative method
+        try {
+            $result = $capsule->connection()->select('SHOW TABLE STATUS');
+            echo "Tables (alternative method):\n";
+            foreach ($result as $row) {
+                echo "- " . $row->Name . "\n";
+            }
+        } catch (Exception $e2) {
+            echo "⚠ Alternative method also failed: " . $e2->getMessage() . "\n";
+        }
     }
     
 } catch (Exception $e) {
     echo "✗ Database connection failed: " . $e->getMessage() . "\n";
-    echo "Please check your database credentials in the .env file.\n";
+    echo "Common solutions:\n";
+    echo "1. Check your database credentials in the .env file\n";
+    echo "2. Verify the database exists in your cPanel\n";
+    echo "3. Check if your hosting provider requires a specific host (not localhost)\n";
+    echo "4. Contact your hosting provider about the MySQL plugin issue\n";
 }
