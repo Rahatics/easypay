@@ -58,7 +58,7 @@ class PaymentController extends Controller
         return response()->json([
             'message' => 'Order created successfully. Redirecting to payment.',
             'order_id' => $order->order_id,
-            'redirect_url' => route('checkout.index', ['order' => $order->order_id]) // অথবা সরাসরি গেটওয়ে পেজ
+            'redirect_url' => route('payment.bkash', ['orderId' => $order->order_id]) // সরাসরি গেটওয়ে পেজ
         ]);
     }
 
