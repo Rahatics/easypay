@@ -3,33 +3,51 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GatewaysController;
+use App\Models\MerchantGateway;
 
 class CheckoutController extends Controller
 {
     /**
-     * Get setup data from database or create initial data
+     * Get setup data from authenticated user
      *
      * @return array
      */
     private function getSetupData()
     {
-        // Check if setup data exists in database
-        $setupRecord = \App\Models\SetupData::first();
+        // Get the authenticated user
+        $user = Auth::user();
 
-        // If not, create initial setup data
-        if (!$setupRecord) {
-            $setupRecord = \App\Models\SetupData::create([
+        // If no user is authenticated, return default data
+        if (!$user) {
+            return [
                 'website_name' => 'My Website',
-                'website_logo' => '',
-                'api_key' => 'sk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'secret_key' => 'ssk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'merchant_id' => 'MID' . rand(100000, 999999)
-            ]);
+                'website_logo' => ''
+            ];
         }
 
-        // Convert to array for compatibility
-        return $setupRecord->toArray();
+        // Return user's website name from session or user's name
+        return [
+            'website_name' => session('website_name', $user->name . '\'s Website'),
+            'website_logo' => session('website_logo', '')
+        ];
+    }
+
+    /**
+     * Get gateway description by name
+     *
+     * @param string $name
+     * @return string
+     */
+    private function getGatewayDescription($name)
+    {
+        $descriptions = [
+            'bkash' => 'bkash is a mobile financial service in Bangladesh that allows users to make payments, send money, and perform various financial transactions using their mobile phones.',
+            'Nagad' => 'Nagad is a government-backed mobile financial service in Bangladesh that provides digital payment solutions to unbanked and underbanked populations.'
+        ];
+
+        return $descriptions[$name] ?? '';
     }
 
     /**
@@ -37,48 +55,95 @@ class CheckoutController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Get gateways data from session (in a real app, this would come from the database)
-        $gateways = session('gateways_data', [
-            [
-                'id' => 1,
-                'name' => 'bkash',
-                'description' => 'bkash is a mobile financial service in Bangladesh that allows users to make payments, send money, and perform various financial transactions using their mobile phones.',
-                'enabled' => true,
-                'fees' => '1.8% per transaction',
-                'account_number' => '01712345678'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Nagad',
-                'description' => 'Nagad is a government-backed mobile financial service in Bangladesh that provides digital payment solutions to unbanked and underbanked populations.',
-                'enabled' => false,
-                'fees' => '1.5% per transaction',
-                'account_number' => ''
-            ]
-        ]);
+        // Get the authenticated user
+        $user = Auth::user();
 
-        // Get setup data from file (in a real app, this would come from the database)
+        // Get user's gateways from database
+        $userGateways = $user->merchantGateways;
+
+        // If user has no gateways, create default ones
+        if ($userGateways->isEmpty()) {
+            $defaultGateways = [
+                [
+                    'gateway_name' => 'bkash',
+                    'is_enabled' => true,
+                    'fees_percentage' => 1.80,
+                    'account_number' => '01712345678'
+                ],
+                [
+                    'gateway_name' => 'Nagad',
+                    'is_enabled' => false,
+                    'fees_percentage' => 1.50,
+                    'account_number' => ''
+                ]
+            ];
+
+            foreach ($defaultGateways as $gateway) {
+                MerchantGateway::create([
+                    'user_id' => $user->id,
+                    'gateway_name' => $gateway['gateway_name'],
+                    'account_number' => $gateway['account_number'],
+                    'fees_percentage' => $gateway['fees_percentage'],
+                    'is_enabled' => $gateway['is_enabled']
+                ]);
+            }
+            // Reload gateways
+            $userGateways = $user->merchantGateways;
+        }
+
+        // Format gateways for the view
+        $gateways = $userGateways->map(function ($gateway) {
+            return [
+                'id' => $gateway->id,
+                'name' => $gateway->gateway_name,
+                'description' => $this->getGatewayDescription($gateway->gateway_name),
+                'enabled' => $gateway->is_enabled,
+                'fees' => $gateway->fees_percentage . '% per transaction',
+                'fees_percentage' => $gateway->fees_percentage,
+                'account_number' => $gateway->account_number
+            ];
+        })->toArray();
+
+        // Get setup data from authenticated user
         $setupData = $this->getSetupData();
 
-        // Sample order data (in a real app, this would come from the session or database)
-        $subtotal = 498.00; // Changed from 500.00 to 498.00 so that with processing fee it rounds to 500
+        // Create order from request data
+        $amount = $request->get('amount', 500.00);
+        $description = $request->get('description', 'Premium Package');
 
         // Calculate processing fee based on selected gateway (for demo, we'll use bkash)
         $selectedGateway = collect($gateways)->firstWhere('name', 'bkash');
-        $processingFee = $selectedGateway ? GatewaysController::calculateProcessingFee($selectedGateway['fees'], $subtotal) : 0;
+        $processingFee = $selectedGateway ? GatewaysController::calculateProcessingFee($selectedGateway['fees_percentage'], $amount) : 0;
 
-        $order = [
-            'id' => 'ORD-'.strtoupper(uniqid()),
-            'product' => 'Premium Package',
-            'quantity' => 1,
-            'subtotal' => $subtotal,
+        // Create order in database
+        $orderRecord = \App\Models\Order::create([
+            'user_id' => $user->id,
+            'order_id' => 'ORD-' . strtoupper(uniqid()),
+            'amount' => $amount,
             'processing_fee' => $processingFee,
-            'total' => $subtotal + $processingFee,
+            'total_amount' => $amount + $processingFee,
+            'currency' => 'BDT',
+            'description' => $description,
+            'customer_info' => null,
+            'status' => 'pending',
+            'gateway' => 'bkash',
+            'transaction_id' => null,
+            'callback_url' => null
+        ]);
+
+        // Format order for view
+        $order = [
+            'id' => $orderRecord->order_id,
+            'product' => $orderRecord->description,
+            'quantity' => 1,
+            'subtotal' => $orderRecord->amount,
+            'processing_fee' => $orderRecord->processing_fee,
+            'total' => $orderRecord->total_amount,
             'merchant' => $setupData['website_name'],
             'merchant_logo' => $setupData['website_logo'],
-            'invoice_id' => 'INV-'.strtoupper(uniqid())
+            'invoice_id' => 'INV-' . strtoupper(uniqid())
         ];
 
         return view('checkout', compact('order', 'gateways'));
@@ -87,50 +152,91 @@ class CheckoutController extends Controller
     /**
      * Show Bkash payment page
      *
+     * @param string $orderId
      * @return \Illuminate\Http\Response
      */
-    public function showBkashPage()
+    public function showBkashPage($orderId = null)
     {
-        // Get setup data from file (in a real app, this would come from the database)
+        // Get the authenticated user
+        $user = Auth::user();
+
+        // Get setup data from authenticated user
         $setupData = $this->getSetupData();
 
-        // Sample gateway data (in a real app, this would come from the database)
-        $gateways = session('gateways_data', [
-            [
-                'id' => 1,
-                'name' => 'bkash',
-                'account_number' => '01712345678',
-                'fees' => '1.8% per transaction'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Nagad',
-                'account_number' => '01787654321',
-                'fees' => '1.5% per transaction'
-            ]
-        ]);
+        // If order ID is provided, fetch the order from database
+        $orderRecord = null;
+        if ($orderId) {
+            $orderRecord = \App\Models\Order::where('user_id', $user->id)
+                ->where('order_id', $orderId)
+                ->first();
+        }
 
-        // Sample order data (in a real app, this would come from the session or database)
-        $subtotal = 498.00;
+        // Get user's gateways from database
+        $userGateways = $user->merchantGateways;
 
-        // Calculate processing fee based on bkash gateway fees
-        $bkashGateway = collect($gateways)->firstWhere('name', 'bkash');
-        $processingFee = $bkashGateway ? GatewaysController::calculateProcessingFee($bkashGateway['fees'], $subtotal) : 0;
+        // If user has no gateways, create default ones
+        if ($userGateways->isEmpty()) {
+            $defaultGateways = [
+                [
+                    'gateway_name' => 'bkash',
+                    'is_enabled' => true,
+                    'fees_percentage' => 1.80,
+                    'account_number' => '01712345678'
+                ],
+                [
+                    'gateway_name' => 'Nagad',
+                    'is_enabled' => false,
+                    'fees_percentage' => 1.50,
+                    'account_number' => ''
+                ]
+            ];
 
-        $order = [
-            'id' => 'ORD-'.strtoupper(uniqid()),
-            'product' => 'Premium Package',
-            'quantity' => 1,
-            'subtotal' => $subtotal,
-            'processing_fee' => $processingFee,
-            'total' => $subtotal + $processingFee,
-            'merchant' => $setupData['website_name'],
-            'merchant_logo' => $setupData['website_logo'],
-            'invoice_id' => 'INV-'.strtoupper(uniqid())
-        ];
+            foreach ($defaultGateways as $gateway) {
+                MerchantGateway::create([
+                    'user_id' => $user->id,
+                    'gateway_name' => $gateway['gateway_name'],
+                    'account_number' => $gateway['account_number'],
+                    'fees_percentage' => $gateway['fees_percentage'],
+                    'is_enabled' => $gateway['is_enabled']
+                ]);
+            }
+            // Reload gateways
+            $userGateways = $user->merchantGateways;
+        }
 
         // Find bkash gateway
-        $bkashGateway = collect($gateways)->firstWhere('name', 'bkash');
+        $bkashGateway = $userGateways->firstWhere('gateway_name', 'bkash');
+
+        // Format order data
+        if ($orderRecord) {
+            $order = [
+                'id' => $orderRecord->order_id,
+                'product' => $orderRecord->description,
+                'quantity' => 1,
+                'subtotal' => $orderRecord->amount,
+                'processing_fee' => $orderRecord->processing_fee,
+                'total' => $orderRecord->total_amount,
+                'merchant' => $setupData['website_name'],
+                'merchant_logo' => $setupData['website_logo'],
+                'invoice_id' => 'INV-' . strtoupper(uniqid())
+            ];
+        } else {
+            // Sample order data (in a real app, this would come from the session or database)
+            $subtotal = 498.00;
+            $processingFee = $bkashGateway ? GatewaysController::calculateProcessingFee($bkashGateway->fees_percentage, $subtotal) : 0;
+
+            $order = [
+                'id' => 'ORD-' . strtoupper(uniqid()),
+                'product' => 'Premium Package',
+                'quantity' => 1,
+                'subtotal' => $subtotal,
+                'processing_fee' => $processingFee,
+                'total' => $subtotal + $processingFee,
+                'merchant' => $setupData['website_name'],
+                'merchant_logo' => $setupData['website_logo'],
+                'invoice_id' => 'INV-' . strtoupper(uniqid())
+            ];
+        }
 
         $paymentData = [
             'payment_id' => '5f6727b97c8d5c94afb77aa10f5403f7f4f0224b',
@@ -139,8 +245,13 @@ class CheckoutController extends Controller
             'merchant' => $order['merchant'],
             'merchant_logo' => $order['merchant_logo'],
             'order' => $order,
-            'recipient_number' => $bkashGateway['account_number'] ?? '017XXXXXXXX',
-            'gateway' => $bkashGateway
+            'recipient_number' => $bkashGateway->account_number ?? '017XXXXXXXX',
+            'gateway' => [
+                'name' => 'bkash',
+                'account_number' => $bkashGateway->account_number,
+                'fees' => $bkashGateway->fees_percentage . '% per transaction',
+                'fees_percentage' => $bkashGateway->fees_percentage
+            ]
         ];
 
         return view('payment.bKash', compact('paymentData'));
@@ -149,50 +260,91 @@ class CheckoutController extends Controller
     /**
      * Show Nagad payment page
      *
+     * @param string $orderId
      * @return \Illuminate\Http\Response
      */
-    public function showNagadPage()
+    public function showNagadPage($orderId = null)
     {
-        // Get setup data from file (in a real app, this would come from the database)
+        // Get the authenticated user
+        $user = Auth::user();
+
+        // Get setup data from authenticated user
         $setupData = $this->getSetupData();
 
-        // Sample gateway data (in a real app, this would come from the database)
-        $gateways = session('gateways_data', [
-            [
-                'id' => 1,
-                'name' => 'bkash',
-                'account_number' => '01712345678',
-                'fees' => '1.8% per transaction'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Nagad',
-                'account_number' => '01787654321',
-                'fees' => '1.5% per transaction'
-            ]
-        ]);
+        // If order ID is provided, fetch the order from database
+        $orderRecord = null;
+        if ($orderId) {
+            $orderRecord = \App\Models\Order::where('user_id', $user->id)
+                ->where('order_id', $orderId)
+                ->first();
+        }
 
-        // Sample order data (in a real app, this would come from the session or database)
-        $subtotal = 498.00;
+        // Get user's gateways from database
+        $userGateways = $user->merchantGateways;
 
-        // Calculate processing fee based on nagad gateway fees
-        $nagadGateway = collect($gateways)->firstWhere('name', 'Nagad');
-        $processingFee = $nagadGateway ? GatewaysController::calculateProcessingFee($nagadGateway['fees'], $subtotal) : 0;
+        // If user has no gateways, create default ones
+        if ($userGateways->isEmpty()) {
+            $defaultGateways = [
+                [
+                    'gateway_name' => 'bkash',
+                    'is_enabled' => true,
+                    'fees_percentage' => 1.80,
+                    'account_number' => '01712345678'
+                ],
+                [
+                    'gateway_name' => 'Nagad',
+                    'is_enabled' => false,
+                    'fees_percentage' => 1.50,
+                    'account_number' => ''
+                ]
+            ];
 
-        $order = [
-            'id' => 'ORD-'.strtoupper(uniqid()),
-            'product' => 'Premium Package',
-            'quantity' => 1,
-            'subtotal' => $subtotal,
-            'processing_fee' => $processingFee,
-            'total' => $subtotal + $processingFee,
-            'merchant' => $setupData['website_name'],
-            'merchant_logo' => $setupData['website_logo'],
-            'invoice_id' => 'INV-'.strtoupper(uniqid())
-        ];
+            foreach ($defaultGateways as $gateway) {
+                MerchantGateway::create([
+                    'user_id' => $user->id,
+                    'gateway_name' => $gateway['gateway_name'],
+                    'account_number' => $gateway['account_number'],
+                    'fees_percentage' => $gateway['fees_percentage'],
+                    'is_enabled' => $gateway['is_enabled']
+                ]);
+            }
+            // Reload gateways
+            $userGateways = $user->merchantGateways;
+        }
 
         // Find nagad gateway
-        $nagadGateway = collect($gateways)->firstWhere('name', 'Nagad');
+        $nagadGateway = $userGateways->firstWhere('gateway_name', 'Nagad');
+
+        // Format order data
+        if ($orderRecord) {
+            $order = [
+                'id' => $orderRecord->order_id,
+                'product' => $orderRecord->description,
+                'quantity' => 1,
+                'subtotal' => $orderRecord->amount,
+                'processing_fee' => $orderRecord->processing_fee,
+                'total' => $orderRecord->total_amount,
+                'merchant' => $setupData['website_name'],
+                'merchant_logo' => $setupData['website_logo'],
+                'invoice_id' => 'INV-' . strtoupper(uniqid())
+            ];
+        } else {
+            // Sample order data (in a real app, this would come from the session or database)
+            $subtotal = 498.00;
+            $processingFee = $nagadGateway ? GatewaysController::calculateProcessingFee($nagadGateway->fees_percentage, $subtotal) : 0;
+
+            $order = [
+                'id' => 'ORD-' . strtoupper(uniqid()),
+                'product' => 'Premium Package',
+                'quantity' => 1,
+                'subtotal' => $subtotal,
+                'processing_fee' => $processingFee,
+                'total' => $subtotal + $processingFee,
+                'merchant' => $setupData['website_name'],
+                'merchant_logo' => $setupData['website_logo'],
+                'invoice_id' => 'INV-' . strtoupper(uniqid())
+            ];
+        }
 
         $paymentData = [
             'payment_id' => '5f6727b97c8d5c94afb77aa10f5403f7f4f0224b',
@@ -201,8 +353,13 @@ class CheckoutController extends Controller
             'merchant' => $order['merchant'],
             'merchant_logo' => $order['merchant_logo'],
             'order' => $order,
-            'recipient_number' => $nagadGateway['account_number'] ?? '017XXXXXXXX',
-            'gateway' => $nagadGateway
+            'recipient_number' => $nagadGateway->account_number ?? '017XXXXXXXX',
+            'gateway' => [
+                'name' => 'Nagad',
+                'account_number' => $nagadGateway->account_number,
+                'fees' => $nagadGateway->fees_percentage . '% per transaction',
+                'fees_percentage' => $nagadGateway->fees_percentage
+            ]
         ];
 
         return view('payment.nagad', compact('paymentData'));
@@ -219,34 +376,25 @@ class CheckoutController extends Controller
         $request->validate([
             'payment_method' => 'required|in:bkash,nagad',
             'order_id' => 'required',
-            'transaction_id' => 'required_if:payment_method,bkash,nagad|max:10',
+            'transaction_id' => 'required|max:10',
             'phone_number' => 'required_if:payment_method,nagad|max:12'
         ]);
 
-        $paymentMethod = $request->payment_method;
-        $orderId = $request->order_id;
-        $transactionId = $request->transaction_id;
-        $phoneNumber = $request->phone_number;
+        // Get the authenticated user
+        $user = Auth::user();
 
-        // In a real application, you would:
-        // 1. Verify the order exists and belongs to the user
-        // 2. Create a payment record in the database
-        // 3. Redirect to the appropriate payment gateway
-        // 4. Handle the callback from the payment gateway
+        // Find the order in the database
+        $order = \App\Models\Order::where('user_id', $user->id)
+            ->where('order_id', $request->order_id)
+            ->firstOrFail();
 
-        // For now, we'll just simulate the redirect
-        switch ($paymentMethod) {
-            case 'bkash':
-                // Verify transaction ID with Bkash API
-                // For demo purposes, we'll just show a success message
-                return redirect()->route('checkout')->with('success', 'Bkash payment processed successfully!');
-            case 'nagad':
-                // Verify transaction ID with Nagad API
-                // For demo purposes, we'll just show a success message
-                return redirect()->route('checkout')->with('success', 'Nagad payment processed successfully!');
-            default:
-                return redirect()->back()->with('error', 'Invalid payment method selected.');
-        }
+        // Update the order with transaction ID and status
+        $order->transaction_id = $request->transaction_id;
+        $order->status = 'processing'; // or 'pending_verification' for manual verification
+        $order->save();
+
+        // Redirect to merchant dashboard or order page with success message
+        return redirect()->route('orders')->with('success', 'Payment verification submitted successfully. Please wait for confirmation.');
     }
 
     /**
@@ -257,13 +405,35 @@ class CheckoutController extends Controller
      */
     public function paymentCallback(Request $request)
     {
+        // Get the authenticated user
+        $user = Auth::user();
+
         // In a real application, you would:
         // 1. Verify the callback is from the payment gateway
         // 2. Update the payment status in the database
         // 3. Send confirmation to the user
         // 4. Notify the merchant
 
-        return response()->json(['status' => 'success', 'message' => 'Payment processed successfully']);
+        // For demo purposes, we'll just update the order status
+        $orderId = $request->get('order_id');
+        $transactionId = $request->get('transaction_id');
+        $status = $request->get('status', 'completed');
+
+        // Find the order
+        $order = \App\Models\Order::where('user_id', $user->id)
+            ->where('order_id', $orderId)
+            ->first();
+
+        if ($order) {
+            // Update order status
+            $order->status = $status;
+            $order->transaction_id = $transactionId;
+            $order->save();
+
+            return response()->json(['status' => 'success', 'message' => 'Payment processed successfully']);
+        }
+
+        return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
     }
 
     /**

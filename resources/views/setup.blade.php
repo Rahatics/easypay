@@ -5,7 +5,7 @@
 @section('content')
 <div class="row">
     <div class="col-12">
-        <h1 class="mb-4">Website Setup</h1>
+        <h1 class="mb-4">Merchant Setup</h1>
 
         @if(session('success'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -18,7 +18,7 @@
             <div class="col-md-8 mb-4">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0">Website Configuration</h5>
+                        <h5 class="mb-0">Merchant Configuration</h5>
                     </div>
                     <div class="card-body">
                         <form method="POST" action="{{ route('setup.update') }}" enctype="multipart/form-data">
@@ -28,7 +28,7 @@
                             <div class="mb-4">
                                 <label for="website_name" class="form-label">Website Name</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control" id="website_name" name="website_name" value="{{ old('website_name', $setupData['website_name'] ?? '') }}" placeholder="Enter your website name" required>
+                                    <input type="text" class="form-control" id="website_name" name="website_name" value="{{ old('website_name', session('website_name', $setupData['website_name'] ?? '')) }}" placeholder="Enter your website name" required>
                                     <button class="btn btn-outline-primary copy-btn" type="button" data-target="website_name">
                                         <i class="bi bi-clipboard"></i> Copy
                                     </button>
@@ -45,9 +45,9 @@
                                     <div class="text-danger mt-1">{{ $message }}</div>
                                 @enderror
 
-                                @if(!empty($setupData['website_logo']))
+                                @if(session('website_logo') || !empty($setupData['website_logo']))
                                     <div class="mt-2">
-                                        <img src="{{ $setupData['website_logo'] }}" alt="Current Logo" class="img-thumbnail" style="max-height: 100px;">
+                                        <img src="{{ session('website_logo', $setupData['website_logo']) }}" alt="Current Logo" class="img-thumbnail" style="max-height: 100px;">
                                     </div>
                                 @endif
                             </div>
@@ -55,10 +55,16 @@
                             <div class="mb-4">
                                 <label for="api_key" class="form-label">API Key</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control" id="api_key" name="api_key" value="{{ old('api_key', $setupData['api_key'] ?? '') }}" readonly>
-                                    <button class="btn btn-outline-primary copy-btn" type="button" data-target="api_key">
-                                        <i class="bi bi-clipboard"></i> Copy
-                                    </button>
+                                    @if(!empty($setupData['api_key']))
+                                        <input type="text" class="form-control" id="api_key" name="api_key" value="{{ old('api_key', $setupData['api_key'] ?? '') }}" readonly>
+                                        <button class="btn btn-outline-primary copy-btn" type="button" data-target="api_key">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-primary generate-credentials-btn" id="generateApiKey">
+                                            <i class="bi bi-key me-2"></i> Generate API Key
+                                        </button>
+                                    @endif
                                 </div>
                                 @error('api_key')
                                     <div class="text-danger mt-1">{{ $message }}</div>
@@ -68,10 +74,16 @@
                             <div class="mb-4">
                                 <label for="secret_key" class="form-label">Secret Key</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control" id="secret_key" name="secret_key" value="{{ old('secret_key', $setupData['secret_key'] ?? '') }}" readonly>
-                                    <button class="btn btn-outline-primary" type="button" id="generateSecretKey">
-                                        <i class="bi bi-arrow-repeat"></i> Generate New
-                                    </button>
+                                    @if(session('plain_secret_key') || !empty($setupData['secret_key']))
+                                        <input type="text" class="form-control" id="secret_key" name="secret_key" value="{{ session('plain_secret_key', old('secret_key', $setupData['secret_key'] ?? '')) }}" readonly>
+                                        <button class="btn btn-outline-primary copy-btn" type="button" data-target="secret_key">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-primary generate-credentials-btn" id="generateSecretKey">
+                                            <i class="bi bi-shield-lock me-2"></i> Generate Secret Key
+                                        </button>
+                                    @endif
                                 </div>
                                 @error('secret_key')
                                     <div class="text-danger mt-1">{{ $message }}</div>
@@ -81,10 +93,16 @@
                             <div class="mb-4">
                                 <label for="merchant_id" class="form-label">Merchant ID</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control" id="merchant_id" name="merchant_id" value="{{ old('merchant_id', $setupData['merchant_id'] ?? '') }}" placeholder="Enter your merchant ID" required>
-                                    <button class="btn btn-outline-primary copy-btn" type="button" data-target="merchant_id">
-                                        <i class="bi bi-clipboard"></i> Copy
-                                    </button>
+                                    @if(!empty($setupData['merchant_id']))
+                                        <input type="text" class="form-control" id="merchant_id" name="merchant_id" value="{{ old('merchant_id', $setupData['merchant_id'] ?? '') }}" readonly>
+                                        <button class="btn btn-outline-primary copy-btn" type="button" data-target="merchant_id">
+                                            <i class="bi bi-clipboard"></i> Copy
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-primary generate-credentials-btn" id="generateMerchantId">
+                                            <i class="bi bi-person-badge me-2"></i> Generate Merchant ID
+                                        </button>
+                                    @endif
                                 </div>
                                 @error('merchant_id')
                                     <div class="text-danger mt-1">{{ $message }}</div>
@@ -115,18 +133,14 @@
                                 <p class="mb-0 text-muted small">Upload your website logo (optional).</p>
                             </li>
                             <li class="list-group-item">
-                                <h6 class="mb-1">API Keys</h6>
-                                <p class="mb-0 text-muted small">Copy your API key for integration. Only Secret Key can be regenerated.</p>
-                            </li>
-                            <li class="list-group-item">
-                                <h6 class="mb-1">Merchant ID</h6>
-                                <p class="mb-0 text-muted small">Enter your unique merchant identifier.</p>
+                                <h6 class="mb-1">API Credentials</h6>
+                                <p class="mb-0 text-muted small">These are your unique API credentials. Copy them to integrate with your website.</p>
                             </li>
                         </ol>
 
                         <div class="alert alert-info mt-4">
                             <h6 class="alert-heading"><i class="bi bi-info-circle-fill me-2"></i>Important</h6>
-                            <p class="mb-0 small">Keep your API keys secure and never share them publicly. Only Secret Key can be regenerated for security purposes.</p>
+                            <p class="mb-0 small">These API credentials are unique to your merchant account. Keep them secure and never share them publicly.</p>
                         </div>
                     </div>
                 </div>
@@ -184,24 +198,11 @@
             });
         });
 
-        // Generate Secret Key
-        document.getElementById('generateSecretKey').addEventListener('click', function() {
-            fetch("{{ route('setup.generate.credentials') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({
-                    type: 'secret_key'
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('secret_key').value = data.secret_key;
-            })
-            .catch(error => {
-                console.error('Error:', error);
+        // Generate credentials buttons functionality
+        document.querySelectorAll('.generate-credentials-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                // Reload the page to generate credentials
+                window.location.reload();
             });
         });
 

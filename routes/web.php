@@ -31,15 +31,15 @@ Route::get('/test-menu', function () {
 
 // Authentication Routes
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:60,1');
 Route::get('/signup', [AuthController::class, 'showSignupForm'])->name('signup');
-Route::post('/signup', [AuthController::class, 'signup']);
+Route::post('/signup', [AuthController::class, 'signup'])->middleware('throttle:10,1');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Checkout Routes (public - no auth required)
 Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout');
-Route::get('/payment/bkash', [CheckoutController::class, 'showBkashPage'])->name('payment.bkash');
-Route::get('/payment/nagad', [CheckoutController::class, 'showNagadPage'])->name('payment.nagad');
+Route::get('/payment/bkash/{orderId?}', [CheckoutController::class, 'showBkashPage'])->name('payment.bkash');
+Route::get('/payment/nagad/{orderId?}', [CheckoutController::class, 'showNagadPage'])->name('payment.nagad');
 Route::post('/checkout/process', [CheckoutController::class, 'processPayment'])->name('checkout.process');
 Route::post('/checkout/callback', [CheckoutController::class, 'paymentCallback'])->name('checkout.callback');
 Route::post('/checkout/cancel', [CheckoutController::class, 'cancel'])->name('checkout.cancel');
@@ -69,30 +69,14 @@ Route::middleware('auth')->group(function () {
     Route::put('/setup', [SetupController::class, 'update'])->name('setup.update');
     Route::post('/setup/generate-credentials', [SetupController::class, 'generateCredentials'])->name('setup.generate.credentials');
     Route::get('/orders', [OrdersController::class, 'index'])->name('orders');
+    Route::post('/orders/{order}/update-status', [OrdersController::class, 'updateStatus'])->name('orders.updateStatus');
+    // Route::delete('/orders/{order}', [OrdersController::class, 'destroy'])->name('orders.destroy');
     Route::get('/gateways', [GatewaysController::class, 'index'])->name('gateways');
     Route::put('/gateways/{id}', [GatewaysController::class, 'update'])->name('gateways.update');
     Route::post('/gateways/{id}/toggle', [GatewaysController::class, 'toggleStatus'])->name('gateways.toggle');
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::put('/settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password.update');
 
-    // Minimal UI Routes
-    Route::get('/dashboard-minimal', function () {
-        return view('dashboard_minimal');
-    })->name('dashboard.minimal');
-
-    Route::get('/setup-minimal', function () {
-        return view('setup_minimal');
-    })->name('setup.minimal');
-
-    Route::get('/orders-minimal', function () {
-        return view('orders_minimal');
-    })->name('orders.minimal');
-
-    Route::get('/gateways-minimal', function () {
-        return view('gateways_minimal');
-    })->name('gateways.minimal');
-
-    Route::get('/settings-minimal', function () {
-        return view('settings_minimal');
-    })->name('settings.minimal');
+    // Removed minimal UI routes as per cleanup requirements
 });

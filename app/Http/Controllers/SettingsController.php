@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 
 class SettingsController extends Controller
@@ -16,7 +17,7 @@ class SettingsController extends Controller
     public function index()
     {
         $user = Auth::user();
-        return view('settings', compact('user'));
+        return view('settings_new', compact('user'));
     }
 
     /**
@@ -40,5 +41,33 @@ class SettingsController extends Controller
         ]);
 
         return redirect()->route('settings')->with('success', 'Settings updated successfully!');
+    }
+
+    /**
+     * Update user password
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function updatePassword(Request $request)
+    {
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+
+        // Check if current password is correct
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return redirect()->back()->withErrors(['current_password' => 'Current password is incorrect.']);
+        }
+
+        // Update password
+        $user = User::find($user->id);
+        $user->password = Hash::make($validated['new_password']);
+        $user->save();
+
+        return redirect()->route('settings')->with('success', 'Password updated successfully!');
     }
 }

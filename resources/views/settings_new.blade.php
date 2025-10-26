@@ -15,27 +15,32 @@
             </div>
             @endif
 
+            @if($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            @endif
+
             <div class="row">
                 <div class="col-md-6 mb-4">
                     <div class="card">
                         <div class="card-body">
                             <h5 class="card-title mb-4">Profile Information</h5>
-                            <form>
+                            <form method="POST" action="{{ route('settings.update') }}">
+                                @csrf
+                                @method('PUT')
                                 <div class="mb-3">
                                     <label for="name" class="form-label">Full Name</label>
-                                    <input type="text" class="form-control" id="name" value="{{ Auth::user()->name }}" required>
+                                    <input type="text" class="form-control" id="name" name="name" value="{{ old('name', $user->name) }}" required>
                                 </div>
                                 <div class="mb-3">
                                     <label for="email" class="form-label">Email Address</label>
-                                    <input type="email" class="form-control" id="email" value="{{ Auth::user()->email }}" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="phone" class="form-label">Phone Number</label>
-                                    <input type="tel" class="form-control" id="phone" placeholder="Enter your phone number">
-                                </div>
-                                <div class="mb-3">
-                                    <label for="address" class="form-label">Address</label>
-                                    <textarea class="form-control" id="address" rows="3" placeholder="Enter your address"></textarea>
+                                    <input type="email" class="form-control" id="email" name="email" value="{{ old('email', $user->email) }}" required>
                                 </div>
                                 <button type="submit" class="btn btn-primary">Save Changes</button>
                             </form>
@@ -45,18 +50,20 @@
                     <div class="card mt-4">
                         <div class="card-body">
                             <h5 class="card-title mb-4">Security Settings</h5>
-                            <form>
+                            <form method="POST" action="{{ route('settings.password.update') }}">
+                                @csrf
+                                @method('PUT')
                                 <div class="mb-3">
                                     <label for="current_password" class="form-label">Current Password</label>
-                                    <input type="password" class="form-control" id="current_password" required>
+                                    <input type="password" class="form-control" id="current_password" name="current_password" required>
                                 </div>
                                 <div class="mb-3">
                                     <label for="new_password" class="form-label">New Password</label>
-                                    <input type="password" class="form-control" id="new_password" required>
+                                    <input type="password" class="form-control" id="new_password" name="new_password" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="confirm_password" class="form-label">Confirm New Password</label>
-                                    <input type="password" class="form-control" id="confirm_password" required>
+                                    <label for="new_password_confirmation" class="form-label">Confirm New Password</label>
+                                    <input type="password" class="form-control" id="new_password_confirmation" name="new_password_confirmation" required>
                                 </div>
                                 <button type="submit" class="btn btn-primary">Update Password</button>
                             </form>

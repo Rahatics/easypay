@@ -13,6 +13,13 @@
                 </button>
             </div>
 
+            @if(session('success'))
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ session('success') }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            @endif
+
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
@@ -47,91 +54,72 @@
                         <table class="table table-hover order-table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Order Details</th>
-                                    <th>Type</th>
+                                    <th>Order ID</th>
                                     <th>Amount</th>
+                                    <th>Customer</th>
+                                    <th>Gateway</th>
+                                    <th>Transaction ID</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach([
-                                    ['date' => 'Oct 24, 2025', 'type' => 'Electronics Purchase', 'to' => 'Amazon', 'amount' => '+$3,500.00', 'status' => 'Completed'],
-                                    ['date' => 'Oct 22, 2025', 'type' => 'Online Shopping', 'to' => 'BestBuy', 'amount' => '-$89.99', 'status' => 'Completed'],
-                                    ['date' => 'Oct 20, 2025', 'type' => 'Order to John', 'from' => 'John Smith', 'amount' => '-$150.00', 'status' => 'Pending'],
-                                    ['date' => 'Oct 18, 2025', 'type' => 'Freelance Service', 'from' => 'Michael Brown', 'amount' => '+$750.00', 'status' => 'Completed'],
-                                    ['date' => 'Oct 15, 2025', 'type' => 'Grocery Shopping', 'to' => 'Walmart', 'amount' => '-$125.50', 'status' => 'Cancelled'],
-                                    ['date' => 'Oct 12, 2025', 'type' => 'Order to Sarah', 'from' => 'Sarah Johnson', 'amount' => '-$200.00', 'status' => 'Completed'],
-                                    ['date' => 'Oct 10, 2025', 'type' => 'Consulting Service', 'to' => 'TechCorp', 'amount' => '+$1,200.00', 'status' => 'Pending'],
-                                    ['date' => 'Oct 8, 2025', 'type' => 'Restaurant Payment', 'to' => 'Burger King', 'amount' => '-$45.75', 'status' => 'Completed']
-                                ] as $order)
+                                @forelse($orders as $order)
                                 <tr>
-                                    <td>{{ $order['date'] }}</td>
+                                    <td>{{ $order->order_id }}</td>
+                                    <td>৳{{ number_format($order->total_amount, 2) }}</td>
+                                    <td>{{ $order->customer_info['name'] ?? 'N/A' }}</td>
+                                    <td>{{ ucfirst($order->gateway) }}</td>
+                                    <td>{{ $order->transaction_id ?? 'N/A' }}</td>
                                     <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="transaction-icon bg-light-primary me-3">
-                                                <i class="bi bi-bag"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-0">{{ $order['type'] }}</h6>
-                                                <small class="text-muted">
-                                                    @if(isset($order['to']))
-                                                        To: {{ $order['to'] }}
-                                                    @elseif(isset($order['from']))
-                                                        From: {{ $order['from'] }}
-                                                    @endif
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        @if(str_starts_with($order['type'], 'Order to'))
-                                            <span class="badge bg-light-red">Sent</span>
-                                        @else
-                                            <span class="badge bg-light-green">Received</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <strong>{{ $order['amount'] }}</strong>
-                                    </td>
-                                    <td>
-                                        @if($order['status'] == 'Completed')
+                                        @if($order->status == 'completed')
                                             <span class="badge badge-success">Completed</span>
-                                        @elseif($order['status'] == 'Pending')
-                                            <span class="badge badge-warning">Pending</span>
-                                        @else
+                                        @elseif($order->status == 'processing')
+                                            <span class="badge badge-warning">Processing</span>
+                                        @elseif($order->status == 'pending')
+                                            <span class="badge badge-info">Pending</span>
+                                        @elseif($order->status == 'failed')
+                                            <span class="badge badge-danger">Failed</span>
+                                        @elseif($order->status == 'cancelled')
                                             <span class="badge badge-secondary">Cancelled</span>
+                                        @else
+                                            <span class="badge badge-secondary">{{ ucfirst($order->status) }}</span>
                                         @endif
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
+                                        @if($order->status == 'processing')
+                                            <form action="{{ route('orders.updateStatus', $order) }}" method="POST" style="display:inline;">
+                                                @csrf
+                                                <input type="hidden" name="status" value="completed">
+                                                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Are you sure you want to approve this order?')">Approve</button>
+                                            </form>
+                                            <form action="{{ route('orders.updateStatus', $order) }}" method="POST" style="display:inline;">
+                                                @csrf
+                                                <input type="hidden" name="status" value="failed">
+                                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to reject this order?')">Reject</button>
+                                            </form>
+                                        @else
+                                            -
+                                        @endif
                                     </td>
                                 </tr>
-                                @endforeach
+                                @empty
+                                <tr>
+                                    <td colspan="7" class="text-center">
+                                        <div class="py-5">
+                                            <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                                            <p class="mt-2">No orders found</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
 
-                    <nav aria-label="Order pagination">
-                        <ul class="pagination justify-content-center">
-                            <li class="page-item disabled">
-                                <a class="page-link" href="#" tabindex="-1">
-                                    <i class="bi bi-chevron-left"></i>
-                                </a>
-                            </li>
-                            <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                            <li class="page-item"><a class="page-link" href="#">2</a></li>
-                            <li class="page-item"><a class="page-link" href="#">3</a></li>
-                            <li class="page-item">
-                                <a class="page-link" href="#">
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                            </li>
-                        </ul>
-                    </nav>
+                    <div class="d-flex justify-content-center mt-4">
+                        {{ $orders->links() }}
+                    </div>
                 </div>
             </div>
 
@@ -140,30 +128,40 @@
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">Order Statistics</h5>
+                            @php
+                                $totalOrders = $orders->total();
+                                $completedOrders = $orders->where('status', 'completed')->count();
+                                $processingOrders = $orders->where('status', 'processing')->count();
+                                $failedOrders = $orders->where('status', 'failed')->count();
+
+                                $completedPercentage = $totalOrders > 0 ? ($completedOrders / $totalOrders * 100) : 0;
+                                $processingPercentage = $totalOrders > 0 ? ($processingOrders / $totalOrders * 100) : 0;
+                                $failedPercentage = $totalOrders > 0 ? ($failedOrders / $totalOrders * 100) : 0;
+                            @endphp
                             <div class="d-flex justify-content-around text-center my-4">
                                 <div>
-                                    <h3 class="text-primary">24</h3>
+                                    <h3 class="text-primary">{{ $totalOrders }}</h3>
                                     <p class="text-muted mb-0">Total Orders</p>
                                 </div>
                                 <div>
-                                    <h3 class="text-success">18</h3>
+                                    <h3 class="text-success">{{ $completedOrders }}</h3>
                                     <p class="text-muted mb-0">Completed</p>
                                 </div>
                                 <div>
-                                    <h3 class="text-warning">4</h3>
-                                    <p class="text-muted mb-0">Pending</p>
+                                    <h3 class="text-warning">{{ $processingOrders }}</h3>
+                                    <p class="text-muted mb-0">Processing</p>
                                 </div>
                                 <div>
-                                    <h3 class="text-danger">2</h3>
-                                    <p class="text-muted mb-0">Cancelled</p>
+                                    <h3 class="text-danger">{{ $failedOrders }}</h3>
+                                    <p class="text-muted mb-0">Failed</p>
                                 </div>
                             </div>
 
                             <div class="progress-stacked">
                                 <div class="progress" role="progressbar" style="height: 10px">
-                                    <div class="progress-bar bg-success" style="width: 75%"></div>
-                                    <div class="progress-bar bg-warning" style="width: 15%"></div>
-                                    <div class="progress-bar bg-danger" style="width: 10%"></div>
+                                    <?php echo '<div class="progress-bar bg-success" style="width: ' . $completedPercentage . '%"></div>'; ?>
+                                    <?php echo '<div class="progress-bar bg-warning" style="width: ' . $processingPercentage . '%"></div>'; ?>
+                                    <?php echo '<div class="progress-bar bg-danger" style="width: ' . $failedPercentage . '%"></div>'; ?>
                                 </div>
                             </div>
                         </div>
@@ -175,38 +173,22 @@
                         <div class="card-body">
                             <h5 class="card-title">Recent Activity</h5>
                             <div class="mt-3">
+                                @forelse($orders->take(3) as $order)
                                 <div class="d-flex align-items-center mb-3">
                                     <div class="transaction-icon bg-light-primary me-3">
-                                        <i class="bi bi-check-circle text-success"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="mb-0">Order Completed</h6>
-                                        <small class="text-muted">Electronics Purchase - $3,500.00</small>
-                                    </div>
-                                    <small class="text-muted ms-auto">2 hours ago</small>
-                                </div>
-
-                                <div class="d-flex align-items-center mb-3">
-                                    <div class="transaction-icon bg-light-green me-3">
-                                        <i class="bi bi-arrow-down-circle text-success"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="mb-0">Payment Received</h6>
-                                        <small class="text-muted">Freelance Service - $750.00</small>
-                                    </div>
-                                    <small class="text-muted ms-auto">1 day ago</small>
-                                </div>
-
-                                <div class="d-flex align-items-center">
-                                    <div class="transaction-icon bg-light me-3">
                                         <i class="bi bi-clock-history text-warning"></i>
                                     </div>
                                     <div>
-                                        <h6 class="mb-0">Order Pending</h6>
-                                        <small class="text-muted">Order to John - $150.00</small>
+                                        <h6 class="mb-0">{{ $order->description }}</h6>
+                                        <small class="text-muted">৳{{ number_format($order->total_amount, 2) }}</small>
                                     </div>
-                                    <small class="text-muted ms-auto">2 days ago</small>
+                                    <small class="text-muted ms-auto">{{ $order->created_at->diffForHumans() }}</small>
                                 </div>
+                                @empty
+                                <div class="text-center py-3">
+                                    <p class="text-muted">No recent activity</p>
+                                </div>
+                                @endforelse
                             </div>
                         </div>
                     </div>

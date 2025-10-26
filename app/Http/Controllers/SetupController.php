@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use App\Models\User;
 
 class SetupController extends Controller
 {
@@ -13,55 +16,28 @@ class SetupController extends Controller
      */
     public function index()
     {
-        // Check if setup data already exists in database
-        $setupData = $this->getSetupData();
+        // Get the authenticated user's data
+        $user = Auth::user();
+
+        // Check if user has API credentials, if not generate them
+        if (empty($user->api_key) || empty($user->secret_key) || empty($user->merchant_id)) {
+            $user = User::find($user->id);
+            $user->api_key = 'ak_' . Str::random(32);
+            $user->secret_key = 'sk_' . Str::random(64);
+            $user->merchant_id = 'mer_' . uniqid();
+            $user->save();
+        }
+
+        // Prepare setup data from user's API credentials
+        $setupData = [
+            'website_name' => $user->name . '\'s Website',
+            'website_logo' => '',
+            'api_key' => $user->api_key,
+            'secret_key' => $user->secret_key,
+            'merchant_id' => $user->merchant_id
+        ];
 
         return view('setup', compact('setupData'));
-    }
-
-    /**
-     * Get setup data from database or create initial data
-     *
-     * @return array
-     */
-    private function getSetupData()
-    {
-        // Check if setup data exists in database
-        $setupRecord = \App\Models\SetupData::first();
-
-        // If not, create initial setup data
-        if (!$setupRecord) {
-            $setupRecord = \App\Models\SetupData::create([
-                'website_name' => 'My Website',
-                'website_logo' => '',
-                'api_key' => 'sk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'secret_key' => 'ssk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'merchant_id' => 'MID' . rand(100000, 999999)
-            ]);
-        }
-
-        // Convert to array for compatibility
-        return $setupRecord->toArray();
-    }
-
-    /**
-     * Save setup data to database
-     *
-     * @param array $setupData
-     * @return void
-     */
-    private function saveSetupData($setupData)
-    {
-        // Get the first (and only) setup record
-        $setupRecord = \App\Models\SetupData::first();
-
-        // If it doesn't exist, create it
-        if (!$setupRecord) {
-            \App\Models\SetupData::create($setupData);
-        } else {
-            // Update existing record
-            $setupRecord->update($setupData);
-        }
     }
 
     /**
@@ -72,45 +48,27 @@ class SetupController extends Controller
      */
     public function update(Request $request)
     {
+        $user = Auth::user();
+
         $request->validate([
             'website_name' => 'required|string|max:255',
             'website_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'api_key' => 'required|string|max:255',
-            'secret_key' => 'required|string|max:255',
             'merchant_id' => 'required|string|max:255'
         ]);
 
-        // Get existing setup data
-        $setupRecord = \App\Models\SetupData::first();
-
-        // If not found, create initial setup data
-        if (!$setupRecord) {
-            $setupRecord = \App\Models\SetupData::create([
-                'website_name' => 'My Website',
-                'website_logo' => '',
-                'api_key' => 'sk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'secret_key' => 'ssk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'merchant_id' => 'MID' . rand(100000, 999999)
-            ]);
-        }
-
-        // Update only the user-editable fields
-        $setupRecord->website_name = $request->website_name;
-        $setupRecord->api_key = $request->api_key;
-        $setupRecord->secret_key = $request->secret_key;
-        $setupRecord->merchant_id = $request->merchant_id;
+        // Update only the website name (API keys are read-only)
+        // Note: In a real application, you might want to store this in a separate user profile table
+        // For now, we'll just use a session variable to store the website name
+        session(['website_name' => $request->website_name]);
 
         // Handle file upload for website_logo
         if ($request->hasFile('website_logo')) {
             // Store the file in storage/app/public/logos with a unique name
             $filename = time() . '_' . $request->file('website_logo')->getClientOriginalName();
             $path = $request->file('website_logo')->storeAs('logos', $filename, 'public');
-            // Save the path to be used in views
-            $setupRecord->website_logo = asset('storage/' . $path);
+            // Save the path to session
+            session(['website_logo' => asset('storage/' . $path)]);
         }
-
-        // Save updated data
-        $setupRecord->save();
 
         return redirect()->back()->with('success', 'Setup configuration updated successfully!');
     }
@@ -123,32 +81,9 @@ class SetupController extends Controller
      */
     public function generateCredentials(Request $request)
     {
-        $type = $request->type;
-
-        // Get existing setup data
-        $setupRecord = \App\Models\SetupData::first();
-
-        // If not found, create initial setup data
-        if (!$setupRecord) {
-            $setupRecord = \App\Models\SetupData::create([
-                'website_name' => 'My Website',
-                'website_logo' => '',
-                'api_key' => 'sk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'secret_key' => 'ssk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32),
-                'merchant_id' => 'MID' . rand(100000, 999999)
-            ]);
-        }
-
-        // Generate new credentials based on type
-        if ($type === 'secret_key') {
-            $setupRecord->secret_key = 'ssk_' . substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 32);
-        }
-
-        // Save updated data
-        $setupRecord->save();
-
+        // This method is no longer needed as API credentials are tied to the user account
         return response()->json([
-            'secret_key' => $setupRecord->secret_key
-        ]);
+            'error' => 'API credentials are tied to your account and cannot be regenerated from this page.'
+        ], 400);
     }
 }

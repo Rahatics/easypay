@@ -23,7 +23,7 @@
         <div class="card stat-card">
             <div class="card-body">
                 <h6 class="card-title text-white-50">Total Balance</h6>
-                <h2 class="display-4 mb-0">$12,450.75</h2>
+                <h2 class="display-4 mb-0">৳{{ number_format($totalRevenue, 2) }}</h2>
             </div>
         </div>
     </div>
@@ -31,7 +31,7 @@
         <div class="card">
             <div class="card-body">
                 <h6 class="card-title text-muted">This Month</h6>
-                <h2 class="display-5 text-primary mb-0">$4,230.50</h2>
+                <h2 class="display-5 text-primary mb-0">৳{{ number_format($thisMonthRevenue, 2) }}</h2>
             </div>
         </div>
     </div>
@@ -39,15 +39,15 @@
         <div class="card">
             <div class="card-body">
                 <h6 class="card-title text-muted">Orders</h6>
-                <h2 class="display-5 text-success mb-0">142</h2>
+                <h2 class="display-5 text-success mb-0">{{ $totalOrders }}</h2>
             </div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3 mb-4">
         <div class="card">
             <div class="card-body">
-                <h6 class="card-title text-muted">Savings</h6>
-                <h2 class="display-5 text-info mb-0">$850.25</h2>
+                <h6 class="card-title text-muted">Pending Orders</h6>
+                <h2 class="display-5 text-info mb-0">{{ $pendingOrders }}</h2>
             </div>
         </div>
     </div>
@@ -77,7 +77,7 @@
                             </div>
                             <h5>Track Order</h5>
                             <p class="text-muted">Check status</p>
-                            <a href="#" class="btn btn-outline-success">Track</a>
+                            <a href="{{ route('orders') }}" class="btn btn-outline-success">Track</a>
                         </div>
                     </div>
                     <div class="col-md-4 mb-4">
@@ -120,49 +120,25 @@
                     <a href="{{ route('orders') }}" class="btn btn-outline-primary">View All</a>
                 </div>
 
+                @forelse($recentOrders as $order)
                 <div class="order-item d-flex align-items-center">
                     <div class="transaction-icon bg-light-primary">
                         <i class="bi bi-bag"></i>
                     </div>
                     <div class="flex-grow-1">
-                        <h6 class="mb-0">Electronics Purchase</h6>
-                        <small class="text-muted">Oct 24, 2025</small>
+                        <h6 class="mb-0">{{ $order->description ?? 'Order #' . $order->order_id }}</h6>
+                        <small class="text-muted">{{ $order->created_at->format('M d, Y') }}</small>
                     </div>
-                    <div class="text-success fw-bold">+$3,500.00</div>
+                    <div class="fw-bold @if($order->status == 'completed') text-success @elseif($order->status == 'failed') text-danger @else text-muted @endif">
+                        ৳{{ number_format($order->amount, 2) }}
+                    </div>
                 </div>
-
-                <div class="order-item d-flex align-items-center">
-                    <div class="transaction-icon bg-light-green">
-                        <i class="bi bi-bag"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Online Shopping</h6>
-                        <small class="text-muted">Oct 22, 2025</small>
-                    </div>
-                    <div class="text-danger fw-bold">-$89.99</div>
+                @empty
+                <div class="text-center py-4">
+                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                    <p class="mt-2">No recent orders</p>
                 </div>
-
-                <div class="order-item d-flex align-items-center">
-                    <div class="transaction-icon bg-light">
-                        <i class="bi bi-bag"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Order to John</h6>
-                        <small class="text-muted">Oct 20, 2025</small>
-                    </div>
-                    <div class="text-danger fw-bold">-$150.00</div>
-                </div>
-
-                <div class="order-item d-flex align-items-center">
-                    <div class="transaction-icon bg-light-primary">
-                        <i class="bi bi-bag"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-0">Freelance Service</h6>
-                        <small class="text-muted">Oct 18, 2025</small>
-                    </div>
-                    <div class="text-success fw-bold">+$750.00</div>
-                </div>
+                @endforelse
             </div>
         </div>
     </div>

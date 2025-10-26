@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\MerchantGateway;
 
 class GatewaysController extends Controller
 {
@@ -13,27 +15,58 @@ class GatewaysController extends Controller
      */
     public function index()
     {
-        // Get gateways data from session (in a real app, this would come from the database)
-        $gateways = session('gateways_data', [
+        // Get the authenticated user
+        $user = Auth::user();
+
+        // Define default gateways
+        $defaultGateways = [
             [
-                'id' => 1,
                 'name' => 'bkash',
                 'description' => 'bkash is a mobile financial service in Bangladesh that allows users to make payments, send money, and perform various financial transactions using their mobile phones.',
-                'enabled' => true,
-                'fees' => '1.8% per transaction',
-                'account_number' => '01712345678'
+                'is_enabled' => true,
+                'fees_percentage' => 1.80,
+                'account_number' => ''
             ],
             [
-                'id' => 2,
                 'name' => 'Nagad',
                 'description' => 'Nagad is a government-backed mobile financial service in Bangladesh that provides digital payment solutions to unbanked and underbanked populations.',
-                'enabled' => false,
-                'fees' => '1.5% per transaction',
+                'is_enabled' => false,
+                'fees_percentage' => 1.50,
                 'account_number' => ''
             ]
-        ]);
+        ];
 
-        return view('gateways', compact('gateways'));
+        // Get user's gateways from database
+        $userGateways = MerchantGateway::where('user_id', $user->id)->get();
+
+        // If user has no gateways, create default ones
+        if ($userGateways->isEmpty()) {
+            foreach ($defaultGateways as $gateway) {
+                MerchantGateway::create([
+                    'user_id' => $user->id,
+                    'gateway_name' => $gateway['name'],
+                    'account_number' => $gateway['account_number'],
+                    'fees_percentage' => $gateway['fees_percentage'],
+                    'is_enabled' => $gateway['is_enabled']
+                ]);
+            }
+            // Reload gateways
+            $userGateways = MerchantGateway::where('user_id', $user->id)->get();
+        }
+
+        // Format gateways for the view
+        $gateways = $userGateways->map(function ($gateway, $index) {
+            return [
+                'id' => $gateway->id,
+                'name' => $gateway->gateway_name,
+                'description' => $this->getGatewayDescription($gateway->gateway_name),
+                'enabled' => $gateway->is_enabled,
+                'fees' => $gateway->fees_percentage . '% per transaction',
+                'account_number' => $gateway->account_number
+            ];
+        })->toArray();
+
+        return view('gateways_new', compact('gateways'));
     }
 
     /**
@@ -45,54 +78,30 @@ class GatewaysController extends Controller
      */
     public function update(Request $request, $id)
     {
-        // Get existing gateways data
-        $gateways = session('gateways_data', [
-            [
-                'id' => 1,
-                'name' => 'bkash',
-                'description' => 'bkash is a mobile financial service in Bangladesh that allows users to make payments, send money, and perform various financial transactions using their mobile phones.',
-                'enabled' => true,
-                'fees' => '1.8% per transaction',
-                'account_number' => '01712345678'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Nagad',
-                'description' => 'Nagad is a government-backed mobile financial service in Bangladesh that provides digital payment solutions to unbanked and underbanked populations.',
-                'enabled' => false,
-                'fees' => '1.5% per transaction',
-                'account_number' => ''
-            ]
-        ]);
+        // Get the authenticated user
+        $user = Auth::user();
 
-        // Find the gateway to update
-        $gatewayIndex = collect($gateways)->search(function ($item) use ($id) {
-            return $item['id'] == $id;
-        });
+        // Find the gateway for this user
+        $gateway = MerchantGateway::where('id', $id)->where('user_id', $user->id)->first();
 
-        if ($gatewayIndex !== false) {
-            // Validate request data
-            $request->validate([
-                'account_number' => 'required|string|max:15',
-                'fees' => 'required|numeric|min:0|max:100'
-            ]);
-
-            // Format fees as percentage string
-            $formattedFees = $request->fees . '% per transaction';
-
-            // Update the gateway data
-            $gateways[$gatewayIndex]['account_number'] = $request->account_number;
-            $gateways[$gatewayIndex]['fees'] = $formattedFees;
-            // Handle checkbox correctly - if not present or value is 0, it means unchecked
-            $gateways[$gatewayIndex]['enabled'] = $request->has('enabled') && $request->enabled == '1' ? true : false;
-
-            // Save updated data to session
-            session(['gateways_data' => $gateways]);
-
-            return redirect()->route('gateways')->with('success', $gateways[$gatewayIndex]['name'] . ' gateway updated successfully!');
+        if (!$gateway) {
+            return redirect()->route('gateways')->with('error', 'Gateway not found!');
         }
 
-        return redirect()->route('gateways')->with('error', 'Gateway not found!');
+        // Validate request data
+        $request->validate([
+            'account_number' => 'required|string|max:15',
+            'fees' => 'required|numeric|min:0|max:100'
+        ]);
+
+        // Update the gateway data
+        $gateway->account_number = $request->account_number;
+        $gateway->fees_percentage = $request->fees;
+        // Handle checkbox correctly - if not present or value is 0, it means unchecked
+        $gateway->is_enabled = $request->has('enabled') && $request->enabled == '1' ? true : false;
+        $gateway->save();
+
+        return redirect()->route('gateways')->with('success', $gateway->gateway_name . ' gateway updated successfully!');
     }
 
     /**
@@ -104,68 +113,50 @@ class GatewaysController extends Controller
      */
     public function toggleStatus(Request $request, $id)
     {
-        // Get existing gateways data
-        $gateways = session('gateways_data', [
-            [
-                'id' => 1,
-                'name' => 'bkash',
-                'description' => 'bkash is a mobile financial service in Bangladesh that allows users to make payments, send money, and perform various financial transactions using their mobile phones.',
-                'enabled' => true,
-                'fees' => '1.8% per transaction',
-                'account_number' => '01712345678'
-            ],
-            [
-                'id' => 2,
-                'name' => 'Nagad',
-                'description' => 'Nagad is a government-backed mobile financial service in Bangladesh that provides digital payment solutions to unbanked and underbanked populations.',
-                'enabled' => false,
-                'fees' => '1.5% per transaction',
-                'account_number' => ''
-            ]
-        ]);
+        // Get the authenticated user
+        $user = Auth::user();
 
-        // Find the gateway to update
-        $gatewayIndex = collect($gateways)->search(function ($item) use ($id) {
-            return $item['id'] == $id;
-        });
+        // Find the gateway for this user
+        $gateway = MerchantGateway::where('id', $id)->where('user_id', $user->id)->first();
 
-        if ($gatewayIndex !== false) {
-            // Toggle the enabled status
-            $gateways[$gatewayIndex]['enabled'] = !$gateways[$gatewayIndex]['enabled'];
-
-            // Save updated data to session
-            session(['gateways_data' => $gateways]);
-
-            $status = $gateways[$gatewayIndex]['enabled'] ? 'enabled' : 'disabled';
-            return response()->json(['success' => true, 'message' => $gateways[$gatewayIndex]['name'] . ' gateway ' . $status . ' successfully!']);
+        if (!$gateway) {
+            return response()->json(['success' => false, 'message' => 'Gateway not found!']);
         }
 
-        return response()->json(['success' => false, 'message' => 'Gateway not found!']);
+        // Toggle the enabled status
+        $gateway->is_enabled = !$gateway->is_enabled;
+        $gateway->save();
+
+        $status = $gateway->is_enabled ? 'enabled' : 'disabled';
+        return response()->json(['success' => true, 'message' => $gateway->gateway_name . ' gateway ' . $status . ' successfully!']);
+    }
+
+    /**
+     * Get gateway description by name
+     *
+     * @param string $name
+     * @return string
+     */
+    private function getGatewayDescription($name)
+    {
+        $descriptions = [
+            'bkash' => 'bkash is a mobile financial service in Bangladesh that allows users to make payments, send money, and perform various financial transactions using their mobile phones.',
+            'Nagad' => 'Nagad is a government-backed mobile financial service in Bangladesh that provides digital payment solutions to unbanked and underbanked populations.'
+        ];
+
+        return $descriptions[$name] ?? '';
     }
 
     /**
      * Calculate processing fee based on gateway fees and amount
      *
-     * @param string $fees
+     * @param float $fees_percentage
      * @param float $amount
      * @return float
      */
-    public static function calculateProcessingFee($fees, $amount)
+    public static function calculateProcessingFee($fees_percentage, $amount)
     {
-        // Parse fees string (e.g., "1.8% per transaction" or "15 BDT per transaction")
-        if (strpos($fees, '%') !== false) {
-            // Percentage-based fee
-            preg_match('/([\d.]+)%/', $fees, $matches);
-            $percentage = isset($matches[1]) ? floatval($matches[1]) : 0;
-            return ($percentage / 100) * $amount;
-        } elseif (strpos($fees, 'BDT') !== false) {
-            // Fixed amount fee
-            preg_match('/([\d.]+) BDT/', $fees, $matches);
-            $fixedAmount = isset($matches[1]) ? floatval($matches[1]) : 0;
-            return $fixedAmount;
-        }
-
-        // Default to 0 if fees format is not recognized
-        return 0;
+        // Calculate percentage-based fee
+        return ($fees_percentage / 100) * $amount;
     }
 }

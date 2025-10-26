@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Order;
 
 class TransactionsController extends Controller
 {
@@ -13,9 +15,9 @@ class TransactionsController extends Controller
      */
     public function index()
     {
-        // In a real app, this would come from the database
-        $transactions = [];
+        // Get all orders for the authenticated merchant
+        $transactions = Auth::user()->orders()->latest()->paginate(15);
 
-        return view('transactions', compact('transactions'));
+        return view('transactions_new', compact('transactions'));
     }
 }

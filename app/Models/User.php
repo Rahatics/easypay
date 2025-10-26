@@ -21,6 +21,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'api_key',
+        'secret_key',
+        'merchant_id',
     ];
 
     /**
@@ -31,6 +34,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'secret_key', // Hide secret key from serialization for security
     ];
 
     /**
@@ -41,4 +45,20 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Get the merchant gateways for the user.
+     */
+    public function merchantGateways()
+    {
+        return $this->hasMany(MerchantGateway::class);
+    }
+
+    /**
+     * Get the orders for the user.
+     */
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
 }

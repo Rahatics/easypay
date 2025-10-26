@@ -224,7 +224,7 @@
                                         </div>
                                     </div>
 
-                                    @if(empty($transactions))
+                                    @if($transactions->isEmpty())
                                         <div class="text-center py-5">
                                             <i class="bi bi-arrow-left-right text-muted" style="font-size: 3rem;"></i>
                                             <h3 class="mt-3">No Transactions Yet</h3>
@@ -240,7 +240,7 @@
                                                     <tr>
                                                         <th>Date</th>
                                                         <th>Description</th>
-                                                        <th>Type</th>
+                                                        <th>Gateway</th>
                                                         <th>Amount</th>
                                                         <th>Status</th>
                                                         <th>Actions</th>
@@ -249,41 +249,39 @@
                                                 <tbody>
                                                     @foreach($transactions as $transaction)
                                                     <tr>
-                                                        <td>{{ $transaction['date'] }}</td>
+                                                        <td>{{ $transaction->created_at->format('M d, Y') }}</td>
                                                         <td>
                                                             <div class="d-flex align-items-center">
                                                                 <div class="transaction-icon bg-light-purple me-3">
-                                                                    <i class="bi bi-arrow-up"></i>
+                                                                    <i class="bi bi-bag"></i>
                                                                 </div>
                                                                 <div>
-                                                                    <h6 class="mb-0">{{ $transaction['type'] }}</h6>
+                                                                    <h6 class="mb-0">{{ $transaction->description ?? 'Order #' . $transaction->order_id }}</h6>
                                                                     <small class="text-muted">
-                                                                        @if(isset($transaction['to']))
-                                                                            To: {{ $transaction['to'] }}
-                                                                        @elseif(isset($transaction['from']))
-                                                                            From: {{ $transaction['from'] }}
-                                                                        @endif
+                                                                        Order ID: {{ $transaction->order_id }}
                                                                     </small>
                                                                 </div>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            @if($transaction['type'] == 'Payment Sent')
-                                                                <span class="badge bg-light-red">Sent</span>
-                                                            @else
-                                                                <span class="badge bg-light-green">Received</span>
-                                                            @endif
+                                                            <span class="badge bg-light-primary">{{ ucfirst($transaction->gateway) }}</span>
                                                         </td>
                                                         <td>
-                                                            <strong>{{ $transaction['amount'] }}</strong>
+                                                            <strong>৳{{ number_format($transaction->total_amount, 2) }}</strong>
                                                         </td>
                                                         <td>
-                                                            @if($transaction['status'] == 'Completed')
+                                                            @if($transaction->status == 'completed')
                                                                 <span class="badge badge-success">Completed</span>
-                                                            @elseif($transaction['status'] == 'Pending')
+                                                            @elseif($transaction->status == 'processing')
+                                                                <span class="badge badge-warning">Processing</span>
+                                                            @elseif($transaction->status == 'pending')
                                                                 <span class="badge badge-warning">Pending</span>
-                                                            @else
+                                                            @elseif($transaction->status == 'failed')
+                                                                <span class="badge badge-secondary">Failed</span>
+                                                            @elseif($transaction->status == 'cancelled')
                                                                 <span class="badge badge-secondary">Cancelled</span>
+                                                            @else
+                                                                <span class="badge badge-secondary">{{ ucfirst($transaction->status) }}</span>
                                                             @endif
                                                         </td>
                                                         <td>
@@ -297,23 +295,9 @@
                                             </table>
                                         </div>
 
-                                        <nav aria-label="Transaction pagination">
-                                            <ul class="pagination justify-content-center">
-                                                <li class="page-item disabled">
-                                                    <a class="page-link" href="#" tabindex="-1">
-                                                        <i class="bi bi-chevron-left"></i>
-                                                    </a>
-                                                </li>
-                                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                                                <li class="page-item"><a class="page-link" href="#">2</a></li>
-                                                <li class="page-item"><a class="page-link" href="#">3</a></li>
-                                                <li class="page-item">
-                                                    <a class="page-link" href="#">
-                                                        <i class="bi bi-chevron-right"></i>
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </nav>
+                                        <div class="d-flex justify-content-center mt-4">
+                                            {{ $transactions->links() }}
+                                        </div>
                                     @endif
                                 </div>
                             </div>

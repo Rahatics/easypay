@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -45,11 +46,19 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
+        $secretKey = 'sk_' . Str::random(64);
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'api_key' => 'ak_' . Str::random(32),
+            'secret_key' => Hash::make($secretKey), // Hash the secret key for storage
+            'merchant_id' => 'mer_' . uniqid(),
         ]);
+
+        // Store the plain secret key in session to show to user only once
+        session(['plain_secret_key' => $secretKey]);
 
         Auth::login($user);
 

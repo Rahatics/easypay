@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Order; // Order মডেল
+use Illuminate\Support\Str; // Str import করুন
+use App\Http\Controllers\GatewaysController; // GatewayController import করুন
 
 class PaymentController extends Controller
 {
@@ -15,32 +18,47 @@ class PaymentController extends Controller
      */
     public function process(Request $request)
     {
-        $request->validate([
-            'amount' => 'required|numeric|min:1',
-            'method' => 'required|in:bkash,nagad',
-            'order_id' => 'required|string'
+        // মিডলওয়্যার থেকে মার্চেন্টের তথ্য নিন
+        $merchant = $request->merchant;
+
+        // মার্চেন্টের সাইট থেকে আসা ডেটা ভ্যালিডেট করুন
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:10',
+            'customer_name' => 'required|string',
+            'customer_email' => 'required|email',
+            'callback_url' => 'required|url',
+            'description' => 'nullable|string',
         ]);
 
-        // In a real application, you would:
-        // 1. Verify the order exists
-        // 2. Create a payment record in the database
-        // 3. Generate a payment URL or token
-        // 4. Return the payment details to the frontend
+        // আপনার গেটওয়ে কন্ট্রোলার থেকে ফি হিসাব করুন (ধাপ ২ এ তৈরি করা)
+        // দ্রষ্টব্য: GatewaysController এর লজিকটি এখানে আবার লেখা বা একটি Service Class এ সরানো ভালো
+        $gatewayController = new GatewaysController();
+        // ডিফল্ট গেটওয়ে (যেমন bkash) এর ফি হিসাব করুন (আপনাকে এটি উন্নত করতে হবে)
+        $processingFee = $gatewayController->calculateProcessingFee($validated['amount'], $merchant->id, 'bkash'); // উদাহরণ
+        $totalAmount = $validated['amount'] + $processingFee;
 
-        // Simulate payment processing
-        $paymentData = [
-            'payment_id' => 'PAY-'.strtoupper(uniqid()),
-            'amount' => $request->amount,
-            'method' => $request->method,
-            'order_id' => $request->order_id,
+        // ধাপ ৩ অনুযায়ী অর্ডার তৈরি করুন
+        $order = Order::create([
+            'user_id' => $merchant->id,
+            'order_id' => 'EP-' . Str::random(10), // ইউনিক অর্ডার আইডি
+            'amount' => $validated['amount'],
+            'processing_fee' => $processingFee,
+            'total_amount' => $totalAmount,
+            'customer_info' => [
+                'name' => $validated['customer_name'],
+                'email' => $validated['customer_email'],
+            ],
             'status' => 'pending',
-            'redirect_url' => $this->getPaymentRedirectUrl($request->method)
-        ];
+            'gateway' => 'bkash', // ডিফল্ট বা কাস্টমার সিলেক্টেড
+            'callback_url' => $validated['callback_url'],
+            'description' => $validated['description'],
+        ]);
 
+        // মার্চেন্টের সাইটকে পেমেন্ট পেজের URL রিটার্ন করুন
         return response()->json([
-            'success' => true,
-            'message' => 'Payment initialized successfully',
-            'data' => $paymentData
+            'message' => 'Order created successfully. Redirecting to payment.',
+            'order_id' => $order->order_id,
+            'redirect_url' => route('checkout.index', ['order' => $order->order_id]) // অথবা সরাসরি গেটওয়ে পেজ
         ]);
     }
 
@@ -48,15 +66,16 @@ class PaymentController extends Controller
      * Get redirect URL for payment method
      *
      * @param string $method
+     * @param string $orderId
      * @return string
      */
-    private function getPaymentRedirectUrl($method)
+    private function getPaymentRedirectUrl($method, $orderId)
     {
         switch ($method) {
             case 'bkash':
-                return 'https://www.bkash.com';
+                return route('payment.bkash', ['orderId' => $orderId]);
             case 'nagad':
-                return 'https://nagad.com.bd';
+                return route('payment.nagad', ['orderId' => $orderId]);
             default:
                 return url('/');
         }

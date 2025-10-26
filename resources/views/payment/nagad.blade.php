@@ -362,6 +362,7 @@
                 <input type="hidden" name="payment_id" value="5f6727b97c8d5c94afb77aa10f5403f7f4f0224b" />
                 <input type="hidden" name="payment_method" value="nagad" />
                 <input type="hidden" name="payment_method_id" value="7" />
+                <input type="hidden" name="order_id" value="{{ $paymentData['order']['id'] }}" />
 
                 <!-- Transaction Id -->
                 <div class="brand-bg p-4 mt-3 rounded-lg">
