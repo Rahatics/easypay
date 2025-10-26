@@ -51,14 +51,14 @@ class CheckoutController extends Controller
     {
         // Get order ID from request
         $orderId = $request->get('order');
-        
+
         if (!$orderId) {
             return redirect('/')->with('error', 'Invalid checkout request.');
         }
 
         // Find the order
         $orderRecord = Order::where('order_id', $orderId)->first();
-        
+
         if (!$orderRecord) {
             return redirect('/')->with('error', 'Order not found.');
         }
@@ -115,7 +115,7 @@ class CheckoutController extends Controller
 
         // Find the order
         $orderRecord = Order::where('order_id', $orderId)->first();
-        
+
         if (!$orderRecord) {
             return redirect('/')->with('error', 'Order not found.');
         }
@@ -131,7 +131,7 @@ class CheckoutController extends Controller
 
         // Find bkash gateway
         $bkashGateway = $userGateways->firstWhere('gateway_name', 'bkash');
-        
+
         if (!$bkashGateway || !$bkashGateway->is_enabled) {
             return redirect('/')->with('error', 'Bkash payment gateway is not available.');
         }
@@ -182,7 +182,7 @@ class CheckoutController extends Controller
 
         // Find the order
         $orderRecord = Order::where('order_id', $orderId)->first();
-        
+
         if (!$orderRecord) {
             return redirect('/')->with('error', 'Order not found.');
         }
@@ -198,7 +198,7 @@ class CheckoutController extends Controller
 
         // Find nagad gateway
         $nagadGateway = $userGateways->firstWhere('gateway_name', 'Nagad');
-        
+
         if (!$nagadGateway || !$nagadGateway->is_enabled) {
             return redirect('/')->with('error', 'Nagad payment gateway is not available.');
         }
@@ -251,7 +251,7 @@ class CheckoutController extends Controller
 
         // Find the order in the database
         $order = Order::where('order_id', $request->order_id)->first();
-        
+
         if (!$order) {
             return redirect('/')->with('error', 'Order not found.');
         }
