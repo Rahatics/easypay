@@ -17,10 +17,9 @@ class AuthenticateApiRequest
             return response()->json(['error' => 'API keys are missing.'], 401);
         }
 
-        // কী ব্যবহার করে মার্চেন্টকে খুঁজুন
+        // কী ব্যবহার করে মার্চেন্টকে খুঁজুন এবং secret key যাচাই করুন
         $merchant = User::where('api_key', $apiKey)->first();
 
-        // Check if merchant exists and verify secret key using direct string comparison
         if (!$merchant || $secretKey !== $merchant->secret_key) {
             return response()->json(['error' => 'Invalid API credentials.'], 401);
         }

@@ -28,13 +28,14 @@ class PaymentController extends Controller
             'customer_email' => 'required|email',
             'callback_url' => 'required|url',
             'description' => 'nullable|string',
+            'gateway' => 'nullable|string|in:bkash,nagad', // পেমেন্ট গেটওয়ে নির্দিষ্ট করুন
         ]);
 
-        // আপনার গেটওয়ে কন্ট্রোলার থেকে ফি হিসাব করুন (ধাপ ২ এ তৈরি করা)
-        // দ্রষ্টব্য: GatewaysController এর লজিকটি এখানে আবার লেখা বা একটি Service Class এ সরানো ভালো
-        $gatewayController = new GatewaysController();
-        // ডিফল্ট গেটওয়ে (যেমন bkash) এর ফি হিসাব করুন (আপনাকে এটি উন্নত করতে হবে)
-        $processingFee = $gatewayController->calculateProcessingFee($validated['amount'], $merchant->id, 'bkash'); // উদাহরণ
+        // ডিফল্ট গেটওয়ে সেট করুন
+        $gateway = $validated['gateway'] ?? 'bkash';
+
+        // গেটওয়ে কন্ট্রোলার থেকে ফি হিসাব করুন
+        $processingFee = GatewaysController::calculateProcessingFee($validated['amount'], $merchant->id, $gateway);
         $totalAmount = $validated['amount'] + $processingFee;
 
         // ধাপ ৩ অনুযায়ী অর্ডার তৈরি করুন
@@ -49,16 +50,18 @@ class PaymentController extends Controller
                 'email' => $validated['customer_email'],
             ],
             'status' => 'pending',
-            'gateway' => 'bkash', // ডিফল্ট বা কাস্টমার সিলেক্টেড
+            'gateway' => $gateway, // কাস্টমার সিলেক্টেড গেটওয়ে
             'callback_url' => $validated['callback_url'],
             'description' => $validated['description'],
         ]);
 
         // মার্চেন্টের সাইটকে পেমেন্ট পেজের URL রিটার্ন করুন
+        $redirectUrl = $this->getPaymentRedirectUrl($gateway, $order->order_id);
+
         return response()->json([
             'message' => 'Order created successfully. Redirecting to payment.',
             'order_id' => $order->order_id,
-            'redirect_url' => route('payment.bkash', ['orderId' => $order->order_id]) // সরাসরি গেটওয়ে পেজ
+            'redirect_url' => $redirectUrl // সরাসরি গেটওয়ে পেজ
         ]);
     }
 
