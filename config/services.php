@@ -31,4 +31,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'easypay' => [
+        'base_url' => env('EASYPAY_BASE_URL', url('/')),
+        'key' => env('EASYPAY_KEY'),
+        'secret' => env('EASYPAY_SECRET'),
+        'merchant_id' => env('EASYPAY_MERCHANT_ID'),
+    ],
+
 ];

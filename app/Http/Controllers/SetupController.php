@@ -153,12 +153,16 @@ class SetupController extends Controller
                   "4. ENVIRONMENT CONFIGURATION\n" .
                   "----------------------------\n" .
                   "1. Open your .env file in your Laravel project root\n" .
-                  "2. Add the following lines:\n\n" .
+                  "2. Add the following lines (leave EASYPAY_BASE_URL empty for automatic detection):\n\n" .
+                  "EASYPAY_BASE_URL=\n" .
                   "EASYPAY_KEY=" . $apiKey . "\n" .
                   "EASYPAY_SECRET=" . $secretKey . "\n" .
                   "EASYPAY_MERCHANT_ID=" . $merchantId . "\n\n" .
+                  "Note: If EASYPAY_BASE_URL is left empty, the system will automatically detect the current domain.\n" .
+                  "If you want to specify a custom domain, set it like: EASYPAY_BASE_URL=https://your-domain.com\n\n" .
                   "3. Open config/services.php and add:\n\n" .
                   "'easypay' => [\n" .
+                  "    'base_url' => env('EASYPAY_BASE_URL', url('/')),\n" .
                   "    'key' => env('EASYPAY_KEY'),\n" .
                   "    'secret' => env('EASYPAY_SECRET'),\n" .
                   "    'merchant_id' => env('EASYPAY_MERCHANT_ID'),\n" .
@@ -189,7 +193,8 @@ class SetupController extends Controller
                   "            'customer_email' => 'required|email',\n" .
                   "            'product_name' => 'required|string',\n" .
                   "        ]);\n\n" .
-                  "        // Get credentials from config\n" .
+                  "        // Get credentials and base URL from config\n" .
+                  "        \$baseUrl = config('services.easypay.base_url');\n" .
                   "        \$apiKey = config('services.easypay.key');\n" .
                   "        \$secretKey = config('services.easypay.secret');\n" .
                   "        \$merchantId = config('services.easypay.merchant_id');\n\n" .
@@ -202,14 +207,14 @@ class SetupController extends Controller
                   "            'description' => \$validated['product_name'],\n" .
                   "            'callback_url' => route('easypay.callback'),\n" .
                   "            'redirect_url' => url('/payment-success'),\n" .
-                  "        ];n\n" .
+                  "        ];\n\n" .
                   "        // Make API request to Easypay\n" .
                   "        \$response = Http::withHeaders([\n" .
                   "            'X-API-KEY' => \$apiKey,\n" .
                   "            'X-SECRET-KEY' => \$secretKey,\n" .
                   "            'Accept' => 'application/json',\n" .
                   "            'Content-Type' => 'application/json',\n" .
-                  "        ])->post('https://api.easypay.com/v1/payment/create', \$paymentData);\n\n" .
+                  "        ])->post(\"{\$baseUrl}/api/payment/process\", \$paymentData);\n\n" .
                   "        // Handle response\n" .
                   "        if (\$response->successful()) {\n" .
                   "            \$responseData = \$response->json();\n" .
@@ -426,13 +431,15 @@ class SetupController extends Controller
                   "            'cancel_url' => route('easypay.cancel'),\n" .
                   "        ];\n\n" .
                   "        try {\n" .
+                  "            // Get Base URL from config\n" .
+                  "            \$baseUrl = config('services.easypay.base_url');\n\n" .
                   "            // Make API request to Easypay\n" .
                   "            \$response = Http::withHeaders([\n" .
                   "                'X-API-KEY' => \$apiKey,\n" .
                   "                'X-SECRET-KEY' => \$secretKey,\n" .
                   "                'Accept' => 'application/json',\n" .
                   "                'Content-Type' => 'application/json',\n" .
-                  "            ])->timeout(30)->post('https://api.easypay.com/v1/payment/create', \$paymentData);\n\n" .
+                  "            ])->timeout(30)->post(\"{\$baseUrl}/api/payment/process\", \$paymentData);\n\n" .
                   "            // Handle response\n" .
                   "            if (\$response->successful()) {\n" .
                   "                \$responseData = \$response->json();\n" .

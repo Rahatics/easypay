@@ -18,29 +18,38 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        // ভ্যালিডেশন পরিবর্তন করে 'login_field' করা হলো
         $request->validate([
-            'email' => 'required|email',
+            'login_field' => 'required|string',
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($request->only('email', 'password'))) {
+        $loginField = $request->input('login_field');
+        $password = $request->input('password');
+
+        // ইনপুটটি ইমেইল নাকি 'name' (ইউজারনেম) তা চেক করুন
+        $fieldType = filter_var($loginField, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+
+        // নতুন ক্রেডেনশিয়াল দিয়ে লগইন করার চেষ্টা করুন
+        $credentials = [
+            $fieldType => $loginField,
+            'password' => $password
+        ];
+
+        if (Auth::attempt($credentials)) {
             /** @var User $user */
             $user = Auth::user();
-            $token = $user->createToken('mobile-app-token')->plainTextToken;
+            $token = $user->createToken('api-token')->plainTextToken;
 
             return response()->json([
-                'success' => true,
-                'message' => 'Authentication successful',
-                'data' => [
-                    'user' => $user,
-                    'token' => $token,
-                ]
+                'token' => $token,
+                'user' => $user
             ]);
         }
 
-        throw ValidationException::withMessages([
-            'email' => ['The provided credentials are incorrect.'],
-        ]);
+        return response()->json([
+            'message' => 'Invalid credentials'
+        ], 401);
     }
 
     /**
