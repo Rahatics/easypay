@@ -6,27 +6,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GatewaysController;
 use App\Models\MerchantGateway;
+use App\Models\Order;
+use App\Models\User;
 
 class CheckoutController extends Controller
 {
     /**
-     * Get setup data from authenticated user
+     * Get setup data from merchant user
      *
+     * @param User $user
      * @return array
      */
-    private function getSetupData()
+    private function getSetupData($user)
     {
-        // Get the authenticated user
-        $user = Auth::user();
-
-        // If no user is authenticated, return default data
-        if (!$user) {
-            return [
-                'website_name' => 'My Website',
-                'website_logo' => ''
-            ];
-        }
-
         // Return user's website name from session or user's name
         return [
             'website_name' => session('website_name', $user->name . '\'s Website'),
@@ -57,41 +49,25 @@ class CheckoutController extends Controller
      */
     public function index(Request $request)
     {
-        // Get the authenticated user
-        $user = Auth::user();
+        // Get order ID from request
+        $orderId = $request->get('order');
+        
+        if (!$orderId) {
+            return redirect('/')->with('error', 'Invalid checkout request.');
+        }
+
+        // Find the order
+        $orderRecord = Order::where('order_id', $orderId)->first();
+        
+        if (!$orderRecord) {
+            return redirect('/')->with('error', 'Order not found.');
+        }
+
+        // Get the merchant user
+        $user = $orderRecord->user;
 
         // Get user's gateways from database
         $userGateways = $user->merchantGateways;
-
-        // If user has no gateways, create default ones
-        if ($userGateways->isEmpty()) {
-            $defaultGateways = [
-                [
-                    'gateway_name' => 'bkash',
-                    'is_enabled' => true,
-                    'fees_percentage' => 1.80,
-                    'account_number' => '01712345678'
-                ],
-                [
-                    'gateway_name' => 'Nagad',
-                    'is_enabled' => false,
-                    'fees_percentage' => 1.50,
-                    'account_number' => ''
-                ]
-            ];
-
-            foreach ($defaultGateways as $gateway) {
-                MerchantGateway::create([
-                    'user_id' => $user->id,
-                    'gateway_name' => $gateway['gateway_name'],
-                    'account_number' => $gateway['account_number'],
-                    'fees_percentage' => $gateway['fees_percentage'],
-                    'is_enabled' => $gateway['is_enabled']
-                ]);
-            }
-            // Reload gateways
-            $userGateways = $user->merchantGateways;
-        }
 
         // Format gateways for the view
         $gateways = $userGateways->map(function ($gateway) {
@@ -106,32 +82,8 @@ class CheckoutController extends Controller
             ];
         })->toArray();
 
-        // Get setup data from authenticated user
-        $setupData = $this->getSetupData();
-
-        // Create order from request data
-        $amount = $request->get('amount', 500.00);
-        $description = $request->get('description', 'Premium Package');
-
-        // Calculate processing fee based on selected gateway (for demo, we'll use bkash)
-        $selectedGateway = collect($gateways)->firstWhere('name', 'bkash');
-        $processingFee = $selectedGateway ? GatewaysController::calculateProcessingFee($selectedGateway['fees_percentage'], $amount) : 0;
-
-        // Create order in database
-        $orderRecord = \App\Models\Order::create([
-            'user_id' => $user->id,
-            'order_id' => 'ORD-' . strtoupper(uniqid()),
-            'amount' => $amount,
-            'processing_fee' => $processingFee,
-            'total_amount' => $amount + $processingFee,
-            'currency' => 'BDT',
-            'description' => $description,
-            'customer_info' => null,
-            'status' => 'pending',
-            'gateway' => 'bkash',
-            'transaction_id' => null,
-            'callback_url' => null
-        ]);
+        // Get setup data from merchant user
+        $setupData = $this->getSetupData($user);
 
         // Format order for view
         $order = [
@@ -157,86 +109,45 @@ class CheckoutController extends Controller
      */
     public function showBkashPage($orderId = null)
     {
-        // Get the authenticated user
-        $user = Auth::user();
-
-        // Get setup data from authenticated user
-        $setupData = $this->getSetupData();
-
-        // If order ID is provided, fetch the order from database
-        $orderRecord = null;
-        if ($orderId) {
-            $orderRecord = \App\Models\Order::where('user_id', $user->id)
-                ->where('order_id', $orderId)
-                ->first();
+        if (!$orderId) {
+            return redirect('/')->with('error', 'Invalid payment request.');
         }
+
+        // Find the order
+        $orderRecord = Order::where('order_id', $orderId)->first();
+        
+        if (!$orderRecord) {
+            return redirect('/')->with('error', 'Order not found.');
+        }
+
+        // Get the merchant user
+        $user = $orderRecord->user;
+
+        // Get setup data from merchant user
+        $setupData = $this->getSetupData($user);
 
         // Get user's gateways from database
         $userGateways = $user->merchantGateways;
 
-        // If user has no gateways, create default ones
-        if ($userGateways->isEmpty()) {
-            $defaultGateways = [
-                [
-                    'gateway_name' => 'bkash',
-                    'is_enabled' => true,
-                    'fees_percentage' => 1.80,
-                    'account_number' => '01712345678'
-                ],
-                [
-                    'gateway_name' => 'Nagad',
-                    'is_enabled' => false,
-                    'fees_percentage' => 1.50,
-                    'account_number' => ''
-                ]
-            ];
-
-            foreach ($defaultGateways as $gateway) {
-                MerchantGateway::create([
-                    'user_id' => $user->id,
-                    'gateway_name' => $gateway['gateway_name'],
-                    'account_number' => $gateway['account_number'],
-                    'fees_percentage' => $gateway['fees_percentage'],
-                    'is_enabled' => $gateway['is_enabled']
-                ]);
-            }
-            // Reload gateways
-            $userGateways = $user->merchantGateways;
-        }
-
         // Find bkash gateway
         $bkashGateway = $userGateways->firstWhere('gateway_name', 'bkash');
+        
+        if (!$bkashGateway || !$bkashGateway->is_enabled) {
+            return redirect('/')->with('error', 'Bkash payment gateway is not available.');
+        }
 
         // Format order data
-        if ($orderRecord) {
-            $order = [
-                'id' => $orderRecord->order_id,
-                'product' => $orderRecord->description,
-                'quantity' => 1,
-                'subtotal' => $orderRecord->amount,
-                'processing_fee' => $orderRecord->processing_fee,
-                'total' => $orderRecord->total_amount,
-                'merchant' => $setupData['website_name'],
-                'merchant_logo' => $setupData['website_logo'],
-                'invoice_id' => 'INV-' . strtoupper(uniqid())
-            ];
-        } else {
-            // Sample order data (in a real app, this would come from the session or database)
-            $subtotal = 498.00;
-            $processingFee = $bkashGateway ? GatewaysController::calculateProcessingFee($bkashGateway->fees_percentage, $subtotal) : 0;
-
-            $order = [
-                'id' => 'ORD-' . strtoupper(uniqid()),
-                'product' => 'Premium Package',
-                'quantity' => 1,
-                'subtotal' => $subtotal,
-                'processing_fee' => $processingFee,
-                'total' => $subtotal + $processingFee,
-                'merchant' => $setupData['website_name'],
-                'merchant_logo' => $setupData['website_logo'],
-                'invoice_id' => 'INV-' . strtoupper(uniqid())
-            ];
-        }
+        $order = [
+            'id' => $orderRecord->order_id,
+            'product' => $orderRecord->description,
+            'quantity' => 1,
+            'subtotal' => $orderRecord->amount,
+            'processing_fee' => $orderRecord->processing_fee,
+            'total' => $orderRecord->total_amount,
+            'merchant' => $setupData['website_name'],
+            'merchant_logo' => $setupData['website_logo'],
+            'invoice_id' => 'INV-' . strtoupper(uniqid())
+        ];
 
         $paymentData = [
             'payment_id' => '5f6727b97c8d5c94afb77aa10f5403f7f4f0224b',
@@ -265,86 +176,45 @@ class CheckoutController extends Controller
      */
     public function showNagadPage($orderId = null)
     {
-        // Get the authenticated user
-        $user = Auth::user();
-
-        // Get setup data from authenticated user
-        $setupData = $this->getSetupData();
-
-        // If order ID is provided, fetch the order from database
-        $orderRecord = null;
-        if ($orderId) {
-            $orderRecord = \App\Models\Order::where('user_id', $user->id)
-                ->where('order_id', $orderId)
-                ->first();
+        if (!$orderId) {
+            return redirect('/')->with('error', 'Invalid payment request.');
         }
+
+        // Find the order
+        $orderRecord = Order::where('order_id', $orderId)->first();
+        
+        if (!$orderRecord) {
+            return redirect('/')->with('error', 'Order not found.');
+        }
+
+        // Get the merchant user
+        $user = $orderRecord->user;
+
+        // Get setup data from merchant user
+        $setupData = $this->getSetupData($user);
 
         // Get user's gateways from database
         $userGateways = $user->merchantGateways;
 
-        // If user has no gateways, create default ones
-        if ($userGateways->isEmpty()) {
-            $defaultGateways = [
-                [
-                    'gateway_name' => 'bkash',
-                    'is_enabled' => true,
-                    'fees_percentage' => 1.80,
-                    'account_number' => '01712345678'
-                ],
-                [
-                    'gateway_name' => 'Nagad',
-                    'is_enabled' => false,
-                    'fees_percentage' => 1.50,
-                    'account_number' => ''
-                ]
-            ];
-
-            foreach ($defaultGateways as $gateway) {
-                MerchantGateway::create([
-                    'user_id' => $user->id,
-                    'gateway_name' => $gateway['gateway_name'],
-                    'account_number' => $gateway['account_number'],
-                    'fees_percentage' => $gateway['fees_percentage'],
-                    'is_enabled' => $gateway['is_enabled']
-                ]);
-            }
-            // Reload gateways
-            $userGateways = $user->merchantGateways;
-        }
-
         // Find nagad gateway
         $nagadGateway = $userGateways->firstWhere('gateway_name', 'Nagad');
+        
+        if (!$nagadGateway || !$nagadGateway->is_enabled) {
+            return redirect('/')->with('error', 'Nagad payment gateway is not available.');
+        }
 
         // Format order data
-        if ($orderRecord) {
-            $order = [
-                'id' => $orderRecord->order_id,
-                'product' => $orderRecord->description,
-                'quantity' => 1,
-                'subtotal' => $orderRecord->amount,
-                'processing_fee' => $orderRecord->processing_fee,
-                'total' => $orderRecord->total_amount,
-                'merchant' => $setupData['website_name'],
-                'merchant_logo' => $setupData['website_logo'],
-                'invoice_id' => 'INV-' . strtoupper(uniqid())
-            ];
-        } else {
-            // Sample order data (in a real app, this would come from the session or database)
-            $subtotal = 498.00;
-            $processingFee = $nagadGateway ? GatewaysController::calculateProcessingFee($nagadGateway->fees_percentage, $subtotal) : 0;
-
-            $order = [
-                'id' => 'ORD-' . strtoupper(uniqid()),
-                'product' => 'Premium Package',
-                'quantity' => 1,
-                'subtotal' => $subtotal,
-                'processing_fee' => $processingFee,
-                'total' => $subtotal + $processingFee,
-                'merchant' => $setupData['website_name'],
-                'merchant_logo' => $setupData['website_logo'],
-                'invoice_id' => 'INV-' . strtoupper(uniqid())
-            ];
-        }
+        $order = [
+            'id' => $orderRecord->order_id,
+            'product' => $orderRecord->description,
+            'quantity' => 1,
+            'subtotal' => $orderRecord->amount,
+            'processing_fee' => $orderRecord->processing_fee,
+            'total' => $orderRecord->total_amount,
+            'merchant' => $setupData['website_name'],
+            'merchant_logo' => $setupData['website_logo'],
+            'invoice_id' => 'INV-' . strtoupper(uniqid())
+        ];
 
         $paymentData = [
             'payment_id' => '5f6727b97c8d5c94afb77aa10f5403f7f4f0224b',
@@ -376,25 +246,23 @@ class CheckoutController extends Controller
         $request->validate([
             'payment_method' => 'required|in:bkash,nagad',
             'order_id' => 'required',
-            'transaction_id' => 'required|max:10',
-            'phone_number' => 'required_if:payment_method,nagad|max:12'
+            'transaction_id' => 'required|max:50'
         ]);
 
-        // Get the authenticated user
-        $user = Auth::user();
-
         // Find the order in the database
-        $order = \App\Models\Order::where('user_id', $user->id)
-            ->where('order_id', $request->order_id)
-            ->firstOrFail();
+        $order = Order::where('order_id', $request->order_id)->first();
+        
+        if (!$order) {
+            return redirect('/')->with('error', 'Order not found.');
+        }
 
         // Update the order with transaction ID and status
         $order->transaction_id = $request->transaction_id;
         $order->status = 'processing'; // or 'pending_verification' for manual verification
         $order->save();
 
-        // Redirect to merchant dashboard or order page with success message
-        return redirect()->route('orders')->with('success', 'Payment verification submitted successfully. Please wait for confirmation.');
+        // Redirect to success page with success message
+        return redirect()->route('checkout')->with('success', 'Payment verification submitted successfully. Please wait for confirmation.');
     }
 
     /**
@@ -405,9 +273,6 @@ class CheckoutController extends Controller
      */
     public function paymentCallback(Request $request)
     {
-        // Get the authenticated user
-        $user = Auth::user();
-
         // In a real application, you would:
         // 1. Verify the callback is from the payment gateway
         // 2. Update the payment status in the database
@@ -420,9 +285,7 @@ class CheckoutController extends Controller
         $status = $request->get('status', 'completed');
 
         // Find the order
-        $order = \App\Models\Order::where('user_id', $user->id)
-            ->where('order_id', $orderId)
-            ->first();
+        $order = Order::where('order_id', $orderId)->first();
 
         if ($order) {
             // Update order status
