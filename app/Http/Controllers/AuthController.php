@@ -53,7 +53,7 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'api_key' => 'ak_' . Str::random(32),
-            'secret_key' => Hash::make($secretKey), // Hash the secret key for storage
+            'secret_key' => $secretKey, // Store the plain secret key
             'merchant_id' => 'mer_' . uniqid(),
         ]);
 

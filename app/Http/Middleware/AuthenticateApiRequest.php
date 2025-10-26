@@ -4,8 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash; // User মডেল import করুন
+use App\Models\User; // User মডেল import করুন
 
 class AuthenticateApiRequest
 {
@@ -21,12 +20,8 @@ class AuthenticateApiRequest
         // কী ব্যবহার করে মার্চেন্টকে খুঁজুন
         $merchant = User::where('api_key', $apiKey)->first();
 
-        // Check if merchant exists and verify secret key using Hash::check
-        if (!$merchant || !Hash::check($secretKey, $merchant->secret_key)) {
-            return response()->json(['error' => 'Invalid API credentials.'], 401);
-        }
-
-        if (!$merchant) {
+        // Check if merchant exists and verify secret key using direct string comparison
+        if (!$merchant || $secretKey !== $merchant->secret_key) {
             return response()->json(['error' => 'Invalid API credentials.'], 401);
         }
 
