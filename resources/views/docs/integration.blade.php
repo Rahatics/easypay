@@ -23,8 +23,34 @@
                     </ul>
                     <p>You can find these credentials in your <a href="{{ route('setup') }}">Merchant Setup</a> page.</p>
 
-                    <h3>2. Create a Payment Request</h3>
-                    <p>To initiate a payment, make a POST request to our API endpoint with the required data:</p>
+                    <h3>2. JavaScript SDK</h3>
+                    <p>We provide a JavaScript SDK to make integration easier. You can download it from:</p>
+                    <p><a href="/js/easypay-sdk.js" class="btn btn-primary" download>Download Easypay SDK</a></p>
+                    <p>Include the SDK in your HTML head tag:</p>
+                    <pre><code class="language-html">&lt;script src="/js/easypay-sdk.js"&gt;&lt;/script&gt;</code></pre>
+                    <p>Initialize the SDK with your API credentials:</p>
+                    <pre><code class="language-javascript">const easypay = new Easypay({
+    apiKey: 'your_api_key_here',
+    secretKey: 'your_secret_key_here'
+});</code></pre>
+                    <p>Create a payment using the SDK:</p>
+                    <pre><code class="language-javascript">easypay.createPayment({
+    amount: 510.00,
+    customer_name: 'John Doe',
+    customer_email: 'john@example.com',
+    callback_url: 'https://yourwebsite.com/payment-callback',
+    description: 'Premium Package'
+}).then(response => {
+    if (response.redirect_url) {
+        // Redirect user to payment page
+        window.location.href = response.redirect_url;
+    }
+}).catch(error => {
+    console.error('Payment creation failed:', error);
+});</code></pre>
+
+                    <h3>3. Create a Payment Request (Manual)</h3>
+                    <p>To initiate a payment manually, make a POST request to our API endpoint with the required data:</p>
 
                     <h5>Using JavaScript (Fetch API)</h5>
                     <pre><code class="language-javascript">const paymentData = {
@@ -93,7 +119,7 @@ axios.post('/api/payment/process', paymentData, {
     "description": "Premium Package"
   }'</code></pre>
 
-                    <h3>3. Required Parameters</h3>
+                    <h3>4. Required Parameters</h3>
                     <div class="table-responsive">
                         <table class="table table-bordered">
                             <thead>
@@ -139,7 +165,7 @@ axios.post('/api/payment/process', paymentData, {
                         </table>
                     </div>
 
-                    <h3>4. API Response</h3>
+                    <h3>5. API Response</h3>
                     <p>On successful payment creation, the API will return a JSON response:</p>
                     <pre><code class="language-json">{
     "message": "Order created successfully. Redirecting to payment.",
@@ -147,7 +173,7 @@ axios.post('/api/payment/process', paymentData, {
     "redirect_url": "https://your-easypay-domain.com/checkout?order=EP-a1b2c3d4e5"
 }</code></pre>
 
-                    <h3>5. Callback/Webhook</h3>
+                    <h3>6. Callback/Webhook</h3>
                     <p>We will send a POST request to your callback_url when the payment status changes. For security, we include a signature in the X-Easypay-Signature header:</p>
                     <pre><code class="language-json">{
     "order_id": "EP-a1b2c3d4e5",
@@ -213,7 +239,7 @@ if (!verifySignature($payload, $signature, YOUR_SECRET_KEY)) {
                         </div>
                     </div>
 
-                    <h3>6. Error Handling</h3>
+                    <h3>7. Error Handling</h3>
                     <p>In case of errors, the API will return appropriate HTTP status codes and error messages:</p>
                     <pre><code class="language-json">{
     "error": "API keys are missing."
@@ -223,7 +249,7 @@ if (!verifySignature($payload, $signature, YOUR_SECRET_KEY)) {
     "error": "Invalid API credentials."
 }</code></pre>
 
-                    <h3>7. Supported Payment Methods</h3>
+                    <h3>8. Supported Payment Methods</h3>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <div class="card">
