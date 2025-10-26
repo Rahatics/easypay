@@ -26,7 +26,8 @@ class Order extends Model
         'status',
         'gateway',
         'transaction_id',
-        'callback_url'
+        'callback_url',
+        'cancel_url'
     ];
 
     /**

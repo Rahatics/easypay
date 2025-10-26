@@ -2,16 +2,63 @@
 
 @section('title', 'Integration Guide - Easypay')
 
+@section('styles')
+<style>
+    .code-block {
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+    }
+
+    .code-block pre {
+        margin-bottom: 0;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        overflow-x: auto;
+    }
+
+    .code-block code {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        white-space: pre;
+    }
+
+    .card-body h5 {
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-body h3 {
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .table-responsive {
+        margin: 1rem 0;
+    }
+
+    .alert {
+        margin: 1.5rem 0;
+    }
+</style>
+@endsection
+
 @section('content')
-<div class="container py-5">
+<div class="container-fluid py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-10">
+        <div class="col-12">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h2 class="mb-0">Easypay Integration Guide</h2>
                 </div>
                 <div class="card-body">
-                    <p class="lead">Follow this guide to integrate Easypay payment gateway into your website or application.</p>
+                    <p class="lead">Follow this guide to securely integrate Easypay payment gateway into your website or application.</p>
+
+                    <div class="alert alert-warning">
+                        <h5><i class="bx bx-error"></i> Security Notice</h5>
+                        <p class="mb-0">Never expose your API credentials (especially Secret Key) in client-side code. Always use server-to-server communication for secure transactions.</p>
+                    </div>
 
                     <hr>
 
@@ -19,107 +66,73 @@
                     <p>To use the Easypay API, you must include your API credentials in the request headers:</p>
                     <ul>
                         <li><strong>X-API-KEY</strong>: Your unique API key</li>
-                        <li><strong>X-SECRET-KEY</strong>: Your secret key</li>
+                        <li><strong>X-SECRET-KEY</strong>: Your secret key (Keep this secure!)</li>
                     </ul>
                     <p>You can find these credentials in your <a href="{{ route('setup') }}">Merchant Setup</a> page.</p>
 
-                    <h3>2. JavaScript SDK</h3>
-                    <p>We provide a JavaScript SDK to make integration easier. You can download it from:</p>
-                    <p><a href="/js/easypay-sdk.js" class="btn btn-primary" download>Download Easypay SDK</a></p>
-                    <p>Include the SDK in your HTML head tag:</p>
-                    <pre><code class="language-html">&lt;script src="/js/easypay-sdk.js"&gt;&lt;/script&gt;</code></pre>
-                    <p>Initialize the SDK with your API credentials:</p>
-                    <pre><code class="language-javascript">const easypay = new Easypay({
-    apiKey: 'your_api_key_here',
-    secretKey: 'your_secret_key_here'
-});</code></pre>
-                    <p>Create a payment using the SDK:</p>
-                    <pre><code class="language-javascript">easypay.createPayment({
-    amount: 510.00,
-    customer_name: 'John Doe',
-    customer_email: 'john@example.com',
-    callback_url: 'https://yourwebsite.com/payment-callback',
-    description: 'Premium Package'
-}).then(response => {
-    if (response.redirect_url) {
-        // Redirect user to payment page
-        window.location.href = response.redirect_url;
+                    <h3>2. Secure Server-to-Server Integration</h3>
+                    <p class="mb-3">The recommended and secure way to integrate Easypay is through server-to-server communication. This approach keeps your secret credentials secure on your server.</p>
+
+                    <h5>Step 1: Create a Route (routes/web.php)</h5>
+                    <p>Merchant creates a route on their site to initiate payments:</p>
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>Route::post('/easypay/initiate', [EasypayController::class, 'initiatePayment']);</code></pre>
+                    </div>
+
+                    <h5>Step 2: Create Controller (EasypayController.php)</h5>
+                    <p>This controller securely communicates with your Easypay server:</p>
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>&lt;?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+
+class EasypayController extends Controller
+{
+    public function initiatePayment(Request $request)
+    {
+        // These keys should come from your .env file
+        $apiKey = config('services.easypay.key');
+        $secretKey = config('services.easypay.secret');
+
+        $response = Http::withHeaders([
+            'X-API-KEY' => $apiKey,
+            'X-SECRET-KEY' => $secretKey,
+        ])->post('https://your-easypay-domain.com/api/payment/process', [
+            'amount' => $request->amount,
+            'customer_name' => $request->customer_name,
+            'customer_email' => $request->customer_email,
+            'callback_url' => url('/easypay/callback'), // Your callback endpoint
+            'description' => $request->product_name,
+        ]);
+
+        if ($response->successful() && isset($response->json()['redirect_url'])) {
+            // Redirect customer to Easypay payment page
+            return redirect($response->json()['redirect_url']);
+        }
+
+        return back()->with('error', 'Payment initiation failed.');
     }
-}).catch(error => {
-    console.error('Payment creation failed:', error);
-});</code></pre>
+}</code></pre>
+                    </div>
 
-                    <h3>3. Create a Payment Request (Manual)</h3>
-                    <p>To initiate a payment manually, make a POST request to our API endpoint with the required data:</p>
+                    <h5>Step 3: Add HTML Button on Merchant Site</h5>
+                    <p>Customers only see this button. No secret keys are exposed:</p>
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>&lt;form action="/easypay/initiate" method="POST"&gt;
+    @csrf
+    &lt;input type="hidden" name="amount" value="500"&gt;
+    &lt;input type="hidden" name="product_name" value="Test Product"&gt;
+    &lt;input type="hidden" name="customer_name" value="John Doe"&gt;
+    &lt;input type="hidden" name="customer_email" value="john@example.com"&gt;
 
-                    <h5>Using JavaScript (Fetch API)</h5>
-                    <pre><code class="language-javascript">const paymentData = {
-    amount: 510.00,
-    customer_name: 'John Doe',
-    customer_email: 'john@example.com',
-    callback_url: 'https://yourwebsite.com/payment-callback',
-    description: 'Premium Package'
-};
+    &lt;button type="submit" class="btn btn-primary"&gt;Pay Now ৳500&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+                    </div>
 
-fetch('/api/payment/process', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': 'your_api_key_here',
-        'X-SECRET-KEY': 'your_secret_key_here'
-    },
-    body: JSON.stringify(paymentData)
-})
-.then(response => response.json())
-.then(data => {
-    if (data.redirect_url) {
-        // Redirect user to payment page
-        window.location.href = data.redirect_url;
-    }
-})
-.catch(error => {
-    console.error('Payment request failed:', error);
-});</code></pre>
-
-                    <h5>Using JavaScript (Axios)</h5>
-                    <pre><code class="language-javascript">const paymentData = {
-    amount: 510.00,
-    customer_name: 'John Doe',
-    customer_email: 'john@example.com',
-    callback_url: 'https://yourwebsite.com/payment-callback',
-    description: 'Premium Package'
-};
-
-axios.post('/api/payment/process', paymentData, {
-    headers: {
-        'X-API-KEY': 'your_api_key_here',
-        'X-SECRET-KEY': 'your_secret_key_here'
-    }
-})
-.then(response => {
-    if (response.data.redirect_url) {
-        // Redirect user to payment page
-        window.location.href = response.data.redirect_url;
-    }
-})
-.catch(error => {
-    console.error('Payment request failed:', error);
-});</code></pre>
-
-                    <h5>Using cURL</h5>
-                    <pre><code class="language-bash">curl -X POST https://your-easypay-domain.com/api/payment/process \
-  -H "Content-Type: application/json" \
-  -H "X-API-KEY: your_api_key_here" \
-  -H "X-SECRET-KEY: your_secret_key_here" \
-  -d '{
-    "amount": 510.00,
-    "customer_name": "John Doe",
-    "customer_email": "john@example.com",
-    "callback_url": "https://yourwebsite.com/payment-callback",
-    "description": "Premium Package"
-  }'</code></pre>
-
-                    <h3>4. Required Parameters</h3>
+                    <h3>3. Required Parameters</h3>
                     <div class="table-responsive">
                         <table class="table table-bordered">
                             <thead>
@@ -165,91 +178,60 @@ axios.post('/api/payment/process', paymentData, {
                         </table>
                     </div>
 
-                    <h3>5. API Response</h3>
+                    <h3>4. API Response</h3>
                     <p>On successful payment creation, the API will return a JSON response:</p>
-                    <pre><code class="language-json">{
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>{
     "message": "Order created successfully. Redirecting to payment.",
     "order_id": "EP-a1b2c3d4e5",
     "redirect_url": "https://your-easypay-domain.com/checkout?order=EP-a1b2c3d4e5"
 }</code></pre>
-
-                    <h3>6. Callback/Webhook</h3>
-                    <p>We will send a POST request to your callback_url when the payment status changes. For security, we include a signature in the X-Easypay-Signature header:</p>
-                    <pre><code class="language-json">{
-    "order_id": "EP-a1b2c3d4e5",
-    "status": "completed",
-    "amount": 510.00,
-    "transaction_id": "TXN-1234567890",
-    "timestamp": "2023-10-26T10:30:00.000000Z"
-}</code></pre>
-
-                    <h4>Webhook Signature Verification</h4>
-                    <p>To verify that the callback is genuinely from Easypay, you should verify the signature:</p>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h5>JavaScript (Node.js) Example:</h5>
-                            <pre><code class="language-javascript">const crypto = require('crypto');
-
-function verifySignature(payload, signature, secretKey) {
-    const payloadJson = JSON.stringify(payload);
-    const expectedSignature = crypto
-        .createHmac('sha256', secretKey)
-        .update(payloadJson)
-        .digest('hex');
-
-    return crypto.timingSafeEqual(
-        Buffer.from(signature, 'hex'),
-        Buffer.from(expectedSignature, 'hex')
-    );
-}
-
-// In your webhook handler
-app.post('/webhook', (req, res) => {
-    const signature = req.headers['x-easypay-signature'];
-    const payload = req.body;
-
-    if (!verifySignature(payload, signature, YOUR_SECRET_KEY)) {
-        return res.status(401).send('Unauthorized');
-    }
-
-    // Process the webhook
-    // ... your code here
-});</code></pre>
-                        </div>
-                        <div class="col-md-6">
-                            <h5>PHP Example:</h5>
-                            <pre><code class="language-php">function verifySignature($payload, $signature, $secretKey) {
-    $payloadJson = json_encode($payload);
-    $expectedSignature = hash_hmac('sha256', $payloadJson, $secretKey);
-    return hash_equals($expectedSignature, $signature);
-}
-
-// In your webhook handler
-$signature = $_SERVER['HTTP_X_EASYPAY_SIGNATURE'] ?? '';
-$payload = json_decode(file_get_contents('php://input'), true);
-
-if (!verifySignature($payload, $signature, YOUR_SECRET_KEY)) {
-    http_response_code(401);
-    echo 'Unauthorized';
-    exit;
-}
-
-// Process the webhook
-// ... your code here</code></pre>
-                        </div>
                     </div>
 
-                    <h3>7. Error Handling</h3>
+                    <h3>5. Callback/Webhook Handling</h3>
+                    <p>We will send a POST request to your callback_url when the payment status changes. Create a route to handle this:</p>
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>Route::post('/easypay/callback', [EasypayController::class, 'handleCallback']);</code></pre>
+                    </div>
+
+                    <p>And implement the callback handler in your controller:</p>
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>public function handleCallback(Request $request)
+{
+    // Verify the callback is from Easypay (optional but recommended)
+    $signature = $request->header('X-Easypay-Signature');
+    $secretKey = config('services.easypay.secret');
+
+    // Verify signature if needed
+    // ... verification logic ...
+
+    // Process the payment status
+    $orderId = $request->order_id;
+    $status = $request->status;
+    $transactionId = $request->transaction_id;
+
+    // Update your database with the payment status
+    // ... your logic here ...
+
+    return response()->json(['status' => 'success']);
+}</code></pre>
+                    </div>
+
+                    <h3>6. Error Handling</h3>
                     <p>In case of errors, the API will return appropriate HTTP status codes and error messages:</p>
-                    <pre><code class="language-json">{
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>{
     "error": "API keys are missing."
 }</code></pre>
+                    </div>
 
-                    <pre><code class="language-json">{
+                    <div class="code-block">
+                        <pre class="bg-dark text-light p-4 rounded"><code>{
     "error": "Invalid API credentials."
 }</code></pre>
+                    </div>
 
-                    <h3>8. Supported Payment Methods</h3>
+                    <h3>7. Supported Payment Methods</h3>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <div class="card">
@@ -270,12 +252,13 @@ if (!verifySignature($payload, $signature, YOUR_SECRET_KEY)) {
                     </div>
 
                     <div class="alert alert-info">
-                        <h5><i class="bx bx-info-circle"></i> Important Notes</h5>
+                        <h5><i class="bx bx-info-circle"></i> Important Security Notes</h5>
                         <ul class="mb-0">
-                            <li>Always keep your API credentials secure and never expose them in client-side code</li>
-                            <li>Validate all incoming webhook requests to ensure they're from Easypay</li>
-                            <li>Always verify the X-Easypay-Signature header to ensure the webhook is genuine</li>
-                            <li>Handle both successful and failed payment scenarios in your callback handler</li>
+                            <li>Always store your API credentials in environment variables, never in code</li>
+                            <li>Never expose your Secret Key in client-side code (JavaScript, HTML, etc.)</li>
+                            <li>Always verify the X-Easypay-Signature header to ensure callbacks are genuine</li>
+                            <li>Use HTTPS for all communication</li>
+                            <li>Validate all incoming data before processing</li>
                         </ul>
                     </div>
                 </div>
@@ -289,9 +272,8 @@ if (!verifySignature($payload, $signature, YOUR_SECRET_KEY)) {
 <script>
     // Simple syntax highlighting for code blocks
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('pre code').forEach((block) => {
-            // In a real implementation, you would use a library like Prism.js or Highlight.js
-            block.classList.add('bg-light', 'p-3', 'rounded');
+        document.querySelectorAll('.code-block').forEach((block) => {
+            block.classList.add('mb-4');
         });
     });
 </script>

@@ -19,10 +19,10 @@ class CheckoutController extends Controller
      */
     private function getSetupData($user)
     {
-        // Return user's website name from session or user's name
+        // Return user's website name and logo from database
         return [
-            'website_name' => session('website_name', $user->name . '\'s Website'),
-            'website_logo' => session('website_logo', '')
+            'website_name' => $user->website_name ?? ($user->name . '\'s Website'),
+            'website_logo' => $user->website_logo ?? ''
         ];
     }
 
@@ -146,7 +146,8 @@ class CheckoutController extends Controller
             'total' => $orderRecord->total_amount,
             'merchant' => $setupData['website_name'],
             'merchant_logo' => $setupData['website_logo'],
-            'invoice_id' => 'INV-' . strtoupper(uniqid())
+            'invoice_id' => 'INV-' . strtoupper(uniqid()),
+            'cancel_url' => $orderRecord->cancel_url
         ];
 
         $paymentData = [
@@ -213,7 +214,8 @@ class CheckoutController extends Controller
             'total' => $orderRecord->total_amount,
             'merchant' => $setupData['website_name'],
             'merchant_logo' => $setupData['website_logo'],
-            'invoice_id' => 'INV-' . strtoupper(uniqid())
+            'invoice_id' => 'INV-' . strtoupper(uniqid()),
+            'cancel_url' => $orderRecord->cancel_url
         ];
 
         $paymentData = [

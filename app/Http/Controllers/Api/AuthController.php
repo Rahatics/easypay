@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use App\Models\User;
 
 class AuthController extends Controller
 {
@@ -23,6 +24,7 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($request->only('email', 'password'))) {
+            /** @var User $user */
             $user = Auth::user();
             $token = $user->createToken('mobile-app-token')->plainTextToken;
 

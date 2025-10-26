@@ -27,6 +27,7 @@ class PaymentController extends Controller
             'customer_name' => 'required|string',
             'customer_email' => 'required|email',
             'callback_url' => 'required|url',
+            'cancel_url' => 'nullable|url',
             'description' => 'nullable|string',
             'gateway' => 'nullable|string|in:bkash,nagad', // পেমেন্ট গেটওয়ে নির্দিষ্ট করুন
         ]);
@@ -52,6 +53,7 @@ class PaymentController extends Controller
             'status' => 'pending',
             'gateway' => $gateway, // কাস্টমার সিলেক্টেড গেটওয়ে
             'callback_url' => $validated['callback_url'],
+            'cancel_url' => $validated['cancel_url'] ?? $validated['callback_url'], // Use callback_url as fallback
             'description' => $validated['description'],
         ]);
 

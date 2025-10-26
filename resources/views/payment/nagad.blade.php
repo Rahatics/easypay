@@ -287,16 +287,12 @@
                 </a>
             </div>
             <div class="d-flex align-items-center">
-                <form action="{{ route('checkout.cancel') }}" method="post">
-                    @csrf
-                    <input type="hidden" name="invoice_id" value="n2Kc7KoKGLliLdPyyTm4" />
-                    <button type="submit" class="cancel-btn">
-                        <svg width="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M13 1L1 13" stroke="#94A9C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                            <path d="M1 1L13 13" stroke="#6D7F9A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
-                </form>
+                <button class="cancel-btn" id="cancelButton" data-cancel-url="{{ $paymentData['order']['cancel_url'] ?? url('/') }}">
+                    <svg width="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 1L1 13" stroke="#94A9C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M1 1L13 13" stroke="#6D7F9A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
             </div>
         </div>
         <!--END nav -->
@@ -337,15 +333,15 @@
                             <div class="payment-info text-md-end">
                                 <div class="mb-1">
                                     <span class="text-[#94a9c7] font-bangla">টাকার পরিমাণঃ</span>
-                                    <span class="text-[#6D7F9A] fw-bold"> ৳ {{ number_format(round($paymentData['order']['subtotal'] / 5) * 5, 0) }}</span>
+                                    <span class="text-[#6D7F9A] fw-bold"> ৳ {{ number_format($paymentData['order']['subtotal'], 0) }}</span>
                                 </div>
                                 <div class="mb-1">
                                     <span class="text-[#94a9c7] font-bangla">প্রসেসিং ফি ({{ $paymentData['gateway']['fees'] ?? '1.5%' }})ঃ</span>
-                                    <span class="text-[#6D7F9A] fw-bold"> ৳ {{ number_format($paymentData['order']['processing_fee'], 2) }}</span>
+                                    <span class="text-[#6D7F9A] fw-bold"> ৳ {{ number_format($paymentData['order']['processing_fee'], 0) }}</span>
                                 </div>
                                 <div>
                                     <span class="text-[#94a9c7] font-bangla">মোট টাকাঃ</span>
-                                    <span class="text-[#6D7F9A] fw-bold"> ৳ {{ number_format(round($paymentData['amount'] / 5) * 5, 0) }}</span>
+                                    <span class="text-[#6D7F9A] fw-bold"> ৳ {{ number_format($paymentData['amount'], 0) }}</span>
                                 </div>
                                 <div>
                                     <span class="text-[#94a9c7] font-bangla">ইনভয়েস আইডিঃ</span>
@@ -390,7 +386,7 @@
                             <hr class="brand-hr my-3">
                             <li class="d-flex text-sm mb-3">
                                 <div><span class="bullet"></span></div>
-                                <p class="instruction-text font-bangla ms-2 mb-0"><strong style="font-size: 1.1em; font-weight: 600;">টাকার পরিমাণঃ</strong> <strong style="font-size: 1.2em; color: #C90008; background-color: #ffffff; padding: 2px 5px; border-radius: 3px;">৳ {{ number_format(round($paymentData['amount'] / 5) * 5, 2) }}</strong></p>
+                                <p class="instruction-text font-bangla ms-2 mb-0"><strong style="font-size: 1.1em; font-weight: 600;">টাকার পরিমাণঃ</strong> <strong style="font-size: 1.2em; color: #C90008; background-color: #ffffff; padding: 2px 5px; border-radius: 3px;">৳ {{ number_format($paymentData['amount'], 0) }}</strong></p>
                             </li>
                             <hr class="brand-hr my-3">
                             <li class="d-flex text-sm mb-3">
@@ -445,6 +441,15 @@
                         console.error('Failed to copy: ', err);
                     });
                 });
+            });
+
+            // Cancel button functionality
+            document.getElementById('cancelButton').addEventListener('click', function() {
+                if (confirm('Are you sure you want to cancel this payment?')) {
+                    // Redirect to merchant's cancel URL or home page if not set
+                    const cancelUrl = this.getAttribute('data-cancel-url');
+                    window.location.href = cancelUrl;
+                }
             });
 
             // Language toggle functionality removed as requested

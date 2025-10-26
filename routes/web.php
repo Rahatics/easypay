@@ -44,8 +44,8 @@ Route::post('/checkout/process', [CheckoutController::class, 'processPayment'])-
 Route::post('/checkout/callback', [CheckoutController::class, 'paymentCallback'])->name('checkout.callback');
 Route::post('/checkout/cancel', [CheckoutController::class, 'cancel'])->name('checkout.cancel');
 
-// Documentation Routes
-Route::get('/docs/integration', function () {
+// Documentation Routes (protected)
+Route::middleware('auth')->get('/docs/integration', function () {
     return view('docs.integration');
 })->name('docs.integration');
 
@@ -68,6 +68,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/setup', [SetupController::class, 'index'])->name('setup');
     Route::put('/setup', [SetupController::class, 'update'])->name('setup.update');
     Route::post('/setup/generate-credentials', [SetupController::class, 'generateCredentials'])->name('setup.generate.credentials');
+    Route::get('/setup/download-guide', [SetupController::class, 'downloadIntegrationGuide'])->name('setup.download.guide');
+    Route::get('/setup/download-code', [SetupController::class, 'downloadCodeSamples'])->name('setup.download.code');
     Route::get('/orders', [OrdersController::class, 'index'])->name('orders');
     Route::post('/orders/{order}/update-status', [OrdersController::class, 'updateStatus'])->name('orders.updateStatus');
     // Route::delete('/orders/{order}', [OrdersController::class, 'destroy'])->name('orders.destroy');

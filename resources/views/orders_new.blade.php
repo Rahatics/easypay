@@ -67,7 +67,9 @@
                                 @forelse($orders as $order)
                                 <tr>
                                     <td>{{ $order->order_id }}</td>
-                                    <td>৳{{ number_format($order->total_amount, 2) }}</td>
+                                    <td data-label="Amount">
+                                        <span class="fw-bold">৳{{ number_format($order->total_amount, 0) }}</span>
+                                    </td>
                                     <td>{{ $order->customer_info['name'] ?? 'N/A' }}</td>
                                     <td>{{ ucfirst($order->gateway) }}</td>
                                     <td>{{ $order->transaction_id ?? 'N/A' }}</td>
@@ -180,7 +182,7 @@
                                     </div>
                                     <div>
                                         <h6 class="mb-0">{{ $order->description }}</h6>
-                                        <small class="text-muted">৳{{ number_format($order->total_amount, 2) }}</small>
+                                        <small class="text-muted">৳{{ number_format($order->total_amount, 0) }}</small>
                                     </div>
                                     <small class="text-muted ms-auto">{{ $order->created_at->diffForHumans() }}</small>
                                 </div>

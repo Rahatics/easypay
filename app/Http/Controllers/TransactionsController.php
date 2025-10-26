@@ -15,8 +15,8 @@ class TransactionsController extends Controller
      */
     public function index()
     {
-        // Get all orders for the authenticated merchant
-        $transactions = Auth::user()->orders()->latest()->paginate(15);
+        // Get all orders for the authenticated merchant using explicit query
+        $transactions = Order::where('user_id', Auth::id())->latest()->paginate(15);
 
         return view('transactions_new', compact('transactions'));
     }

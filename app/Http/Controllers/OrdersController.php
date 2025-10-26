@@ -16,8 +16,8 @@ class OrdersController extends Controller
      */
     public function index()
     {
-        // Auth::user()->orders() relationship use kore shudhu oi merchant er order anbe
-        $orders = Auth::user()->orders()->latest()->paginate(15); // notun ordergulo age dekhabe
+        // Use explicit query instead of relationship
+        $orders = Order::where('user_id', Auth::id())->latest()->paginate(15); // notun ordergulo age dekhabe
 
         // Apnar pochonder view file e $orders variableti pass korun
         // Apnar projekte 3ti vinno order er view ache, ami orders_new.blade.php bebohar korchi

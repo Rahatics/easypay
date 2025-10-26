@@ -302,7 +302,7 @@
         <div class="nav-header">
             <div class="logo">EP</div>
             <div class="d-flex align-items-center">
-                <button class="cancel-btn" id="cancelButton">
+                <button class="cancel-btn" id="cancelButton" data-cancel-url="{{ url('/') }}">
                     <i class="bx bx-x"></i>
                 </button>
             </div>
@@ -330,18 +330,9 @@
                 <span class="item-label">Product</span>
                 <span class="item-value">{{ $order['product'] ?? 'Premium Package' }}</span>
             </div>
-            <div class="summary-item">
-                <span class="item-label">Quantity</span>
-                <span class="item-value">{{ $order['quantity'] ?? '1' }}</span>
-            </div>
-            <div class="summary-item">
-                <span class="item-label">Subtotal</span>
-                <span class="item-value">৳ {{ number_format($order['subtotal'] ?? 500.00, 0) }}</span>
-            </div>
-            <!-- Processing fees will be added based on selected payment method -->
             <div class="summary-item total-amount">
                 <span class="total-label">Total Amount</span>
-                <span class="total-value">৳ {{ number_format(round(($order['subtotal'] ?? 500.00) / 5) * 5, 0) }}</span>
+                <span class="total-value">৳ {{ number_format($order['subtotal'] ?? 500.00, 0) }}</span>
             </div>
         </div>
         <!--END Order Summary -->
@@ -357,18 +348,6 @@
                     <div>
                         <h5 class="payment-name">Bkash</h5>
                         <p class="payment-desc">Pay with your Bkash mobile wallet</p>
-                        @php
-                            $bkashGateway = collect($gateways)->firstWhere('name', 'bkash');
-                            if ($bkashGateway && strpos($bkashGateway['fees'], '%') !== false) {
-                                preg_match('/([\d.]+)%/', $bkashGateway['fees'], $matches);
-                                $bkashFeePercentage = isset($matches[1]) ? floatval($matches[1]) : 0;
-                            } else {
-                                $bkashFeePercentage = 0;
-                            }
-                        @endphp
-                        @if($bkashFeePercentage > 0)
-                            <span class="badge bg-primary mt-1">+{{ $bkashFeePercentage }}% fee</span>
-                        @endif
                     </div>
                 </div>
             </a>
@@ -380,18 +359,6 @@
                     <div>
                         <h5 class="payment-name">Nagad</h5>
                         <p class="payment-desc">Pay with your Nagad mobile wallet</p>
-                        @php
-                            $nagadGateway = collect($gateways)->firstWhere('name', 'Nagad');
-                            if ($nagadGateway && strpos($nagadGateway['fees'], '%') !== false) {
-                                preg_match('/([\d.]+)%/', $nagadGateway['fees'], $matches);
-                                $nagadFeePercentage = isset($matches[1]) ? floatval($matches[1]) : 0;
-                            } else {
-                                $nagadFeePercentage = 0;
-                            }
-                        @endphp
-                        @if($nagadFeePercentage > 0)
-                            <span class="badge bg-primary mt-1">+{{ $nagadFeePercentage }}% fee</span>
-                        @endif
                     </div>
                 </div>
             </a>
@@ -417,9 +384,9 @@
             // Cancel button
             cancelButton.addEventListener('click', function() {
                 if (confirm('Are you sure you want to cancel this payment?')) {
-                    // In a real application, you would redirect to the cancel URL
-                    alert('Payment cancelled. Redirecting to merchant website...');
-                    // window.location.href = '/checkout/cancel';
+                    // Redirect to merchant's cancel URL or home page if not set
+                    const cancelUrl = this.getAttribute('data-cancel-url');
+                    window.location.href = cancelUrl;
                 }
             });
         });

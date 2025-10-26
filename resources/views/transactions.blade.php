@@ -267,7 +267,7 @@
                                                             <span class="badge bg-light-primary">{{ ucfirst($transaction->gateway) }}</span>
                                                         </td>
                                                         <td>
-                                                            <strong>৳{{ number_format($transaction->total_amount, 2) }}</strong>
+                                                            <strong>৳{{ number_format($transaction->total_amount, 0) }}</strong>
                                                         </td>
                                                         <td>
                                                             @if($transaction->status == 'completed')

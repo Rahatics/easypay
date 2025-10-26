@@ -24,6 +24,8 @@ class User extends Authenticatable
         'api_key',
         'secret_key',
         'merchant_id',
+        'website_name',
+        'website_logo',
     ];
 
     /**

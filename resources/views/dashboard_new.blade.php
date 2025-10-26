@@ -23,7 +23,7 @@
         <div class="card stat-card">
             <div class="card-body">
                 <h6 class="card-title text-white-50">Total Balance</h6>
-                <h2 class="display-4 mb-0">৳{{ number_format($totalRevenue, 2) }}</h2>
+                <h2 class="display-4 mb-0">৳{{ number_format($totalRevenue, 0) }}</h2>
             </div>
         </div>
     </div>
@@ -31,7 +31,7 @@
         <div class="card">
             <div class="card-body">
                 <h6 class="card-title text-muted">This Month</h6>
-                <h2 class="display-5 text-primary mb-0">৳{{ number_format($thisMonthRevenue, 2) }}</h2>
+                <h2 class="display-5 text-primary mb-0">৳{{ number_format($thisMonthRevenue, 0) }}</h2>
             </div>
         </div>
     </div>
@@ -130,7 +130,7 @@
                         <small class="text-muted">{{ $order->created_at->format('M d, Y') }}</small>
                     </div>
                     <div class="fw-bold @if($order->status == 'completed') text-success @elseif($order->status == 'failed') text-danger @else text-muted @endif">
-                        ৳{{ number_format($order->amount, 2) }}
+                        ৳{{ number_format($order->amount, 0) }}
                     </div>
                 </div>
                 @empty
