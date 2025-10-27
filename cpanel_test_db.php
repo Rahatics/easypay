@@ -37,7 +37,7 @@ $capsule = new Capsule;
 
 try {
     echo "Connecting to database...\n";
-    
+
     $capsule->addConnection([
         'driver'    => 'mysql',
         'host'      => $_ENV['DB_HOST'],
@@ -61,7 +61,7 @@ try {
     // Test the connection
     $capsule->connection()->select('SELECT 1');
     echo "✓ Database connection successful!\n";
-    
+
     // Show existing tables using a simpler query
     try {
         $tables = $capsule->connection()->select('SHOW TABLES');
@@ -83,7 +83,7 @@ try {
             echo "⚠ Alternative method also failed: " . $e2->getMessage() . "\n";
         }
     }
-    
+
 } catch (Exception $e) {
     echo "✗ Database connection failed: " . $e->getMessage() . "\n";
     echo "Common solutions:\n";
