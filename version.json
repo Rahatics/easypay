@@ -1,0 +1,6 @@
+{
+    "latest_version": "1.0.0",
+    "force_update": false,
+    "download_url": "https://github.com/Rahatics/easypay/raw/main/release/easypay_release.apk",
+    "release_notes": "Initial Release with Online Status & Dashboard"
+}
