@@ -1,6 +1,6 @@
 {
-    "latest_version": "1.1.0",
-    "force_update": false,
+    "latest_version": "1.2.0",
+    "force_update": true,
     "download_url": "https://github.com/Rahatics/easypay/raw/main/release/easypay_release.apk",
-    "release_notes": "New Features:\n- Dashboard Statistics (Balance, Orders)\n- Order Filtering (Pending/Approved)\n- Check for Updates in Settings"
+    "release_notes": "Improved Update System:\n- In-App Updates (No Browser Redirect)\n- Strict SMS Filtering (Bkash/Nagad/Rocket/Upay only)\n- UI Fixes for SMS Tab"
 }
